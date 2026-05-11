@@ -3,7 +3,6 @@ package com.example.cyan.admin.controller;
 import java.util.List;
 
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,8 +20,6 @@ import jakarta.validation.constraints.NotNull;
 
 @Validated
 @RestController
-@CrossOrigin(origins = { "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:4173",
-        "http://127.0.0.1:4173", "http://localhost:3000", "http://127.0.0.1:3000" })
 @RequestMapping("/api/admin/orders")
 public class AdminOrderController {
 
