@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,7 +19,15 @@ import com.example.cyan.common.util.SlugUtils;
 @Service
 public class CloudinaryMediaStorageService {
 
-    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
+    private static final Logger log = LoggerFactory.getLogger(CloudinaryMediaStorageService.class);
+
+    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
+            "image/jpeg",
+            "image/jpg",
+            "image/pjpeg",
+            "image/png",
+            "image/webp",
+            "image/gif");
     private static final Set<String> ALLOWED_VIDEO_TYPES = Set.of("video/mp4");
 
     @Value("${cloudinary.cloud-name:}")
@@ -40,7 +50,7 @@ public class CloudinaryMediaStorageService {
             throw new BadRequestException("Please choose a file to upload");
         }
 
-        String contentType = file.getContentType();
+        String contentType = normalizeContentType(file.getContentType());
         validateContentType(contentType);
 
         if (!isConfigured()) {
@@ -87,7 +97,9 @@ public class CloudinaryMediaStorageService {
         } catch (IOException ex) {
             throw new BadRequestException("Failed to read uploaded file");
         } catch (Exception ex) {
-            throw new BadRequestException("Failed to upload file to Cloudinary");
+            log.error("Cloudinary upload failed. originalFilename={}, contentType={}, folder={}",
+                    file.getOriginalFilename(), contentType, folder, ex);
+            throw new BadRequestException(buildUploadErrorMessage(ex));
         }
     }
 
@@ -109,6 +121,14 @@ public class CloudinaryMediaStorageService {
         return contentType != null && contentType.startsWith("video/");
     }
 
+    private String normalizeContentType(String contentType) {
+        if (contentType == null) {
+            return null;
+        }
+
+        return contentType.trim().toLowerCase();
+    }
+
     private String resolveFolder(String folder, String resourceType) {
         String baseFolder = "video".equals(resourceType) ? videoFolder : imageFolder;
         String safeFolder = SlugUtils.toSlug(folder);
@@ -124,6 +144,21 @@ public class CloudinaryMediaStorageService {
             return filename;
         }
         return filename.substring(0, extensionIndex);
+    }
+
+    private String buildUploadErrorMessage(Exception ex) {
+        String message = ex.getMessage();
+        Throwable cause = ex.getCause();
+
+        if ((message == null || message.isBlank()) && cause != null) {
+            message = cause.getMessage();
+        }
+
+        if (message == null || message.isBlank()) {
+            return "Failed to upload file to Cloudinary";
+        }
+
+        return "Failed to upload file to Cloudinary: " + message;
     }
 
     public record StoredFile(String url, String filename, String contentType, long size, String resourceType) {
