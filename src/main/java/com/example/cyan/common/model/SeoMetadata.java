@@ -1,5 +1,7 @@
 package com.example.cyan.common.model;
 
+import java.util.stream.StreamSupport;
+
 import jakarta.validation.constraints.Size;
 
 public class SeoMetadata {
@@ -33,7 +35,23 @@ public class SeoMetadata {
         return keywords;
     }
 
-    public void setKeywords(String keywords) {
-        this.keywords = keywords;
+    public void setKeywords(Object keywords) {
+        if (keywords == null) {
+            this.keywords = null;
+            return;
+        }
+
+        if (keywords instanceof Iterable<?> values) {
+            String normalized = StreamSupport.stream(values.spliterator(), false)
+                    .map(value -> value == null ? null : value.toString())
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .collect(java.util.stream.Collectors.joining(", "));
+            this.keywords = normalized.isBlank() ? null : normalized;
+            return;
+        }
+
+        String normalized = keywords.toString().trim();
+        this.keywords = normalized.isBlank() ? null : normalized;
     }
 }
