@@ -13,6 +13,7 @@ public class OrderItem {
     private String productId;
 
     @NotBlank
+    @Size(max = 180)
     private String variantCode;
 
     @NotBlank
