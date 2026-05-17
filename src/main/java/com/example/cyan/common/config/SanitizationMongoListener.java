@@ -17,6 +17,7 @@ import com.example.cyan.common.util.TextSanitizer;
 import com.example.cyan.content.model.Banner;
 import com.example.cyan.content.model.Editorial;
 import com.example.cyan.content.model.EditorialSection;
+import com.example.cyan.content.model.ProductCollection;
 import com.example.cyan.order.model.Address;
 import com.example.cyan.order.model.CustomerInfo;
 import com.example.cyan.order.model.MomoPaymentInfo;
@@ -37,6 +38,8 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
             sanitizeBanner(banner);
         } else if (source instanceof Editorial editorial) {
             sanitizeEditorial(editorial);
+        } else if (source instanceof ProductCollection collection) {
+            sanitizeCollection(collection);
         } else if (source instanceof Order order) {
             sanitizeOrder(order);
         }
@@ -123,6 +126,20 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
         }
         if (editorial.getSections() != null) {
             editorial.getSections().forEach(this::sanitizeSection);
+        }
+    }
+
+    private void sanitizeCollection(ProductCollection collection) {
+        collection.setName(TextSanitizer.cleanPlainText(collection.getName()));
+        collection.setSlug(TextSanitizer.cleanPlainText(collection.getSlug()));
+        collection.setSummary(TextSanitizer.cleanPlainText(collection.getSummary()));
+        collection.setDescription(TextSanitizer.cleanRichText(collection.getDescription()));
+        sanitizeMedia(collection.getCoverMedia());
+        sanitizeSeo(collection.getSeo());
+        if (collection.getProductIds() != null) {
+            collection.setProductIds(collection.getProductIds().stream()
+                    .map(TextSanitizer::cleanPlainText)
+                    .toList());
         }
     }
 

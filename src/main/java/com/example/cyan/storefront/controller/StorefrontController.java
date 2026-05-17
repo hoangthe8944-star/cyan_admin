@@ -17,12 +17,18 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.cyan.common.model.enums.BannerPlacement;
 import com.example.cyan.content.model.Banner;
 import com.example.cyan.content.model.Editorial;
+import com.example.cyan.order.dto.CheckoutOrderResponse;
+import com.example.cyan.order.dto.CreateOrderRequest;
+import com.example.cyan.order.dto.MomoIpnRequest;
 import com.example.cyan.order.model.Order;
+import com.example.cyan.storefront.dto.CollectionDetailResponse;
+import com.example.cyan.storefront.dto.CollectionSummaryResponse;
 import com.example.cyan.storefront.dto.CategoryTreeResponse;
 import com.example.cyan.storefront.dto.EditorialSummaryResponse;
 import com.example.cyan.storefront.dto.HomeResponse;
 import com.example.cyan.storefront.dto.ProductCardResponse;
 import com.example.cyan.storefront.dto.ProductCatalogResponse;
+import com.example.cyan.storefront.dto.SearchSuggestionResponse;
 import com.example.cyan.storefront.service.StorefrontService;
 
 import jakarta.validation.Valid;
@@ -54,6 +60,16 @@ public class StorefrontController {
         return storefrontService.getCategoryTree();
     }
 
+    @GetMapping("/collections")
+    public List<CollectionSummaryResponse> collections(@RequestParam(required = false) Boolean featured) {
+        return storefrontService.getPublishedCollections(featured);
+    }
+
+    @GetMapping("/collections/{slug}")
+    public CollectionDetailResponse collectionDetail(@PathVariable String slug) {
+        return storefrontService.getPublishedCollectionBySlug(slug);
+    }
+
     @GetMapping("/categories/{slug}")
     public CategoryTreeResponse categoryDetail(@PathVariable String slug) {
         return storefrontService.getCategoryBySlug(slug);
@@ -83,6 +99,13 @@ public class StorefrontController {
         return storefrontService.filterActiveProducts(keyword, categorySlug, null, null, null);
     }
 
+    @GetMapping("/search/suggestions")
+    public SearchSuggestionResponse searchSuggestions(@RequestParam String keyword,
+            @RequestParam(defaultValue = "8") int keywordLimit,
+            @RequestParam(defaultValue = "6") int productLimit) {
+        return storefrontService.getSearchSuggestions(keyword, keywordLimit, productLimit);
+    }
+
     @GetMapping("/products/{slug}")
     public com.example.cyan.catalog.model.Product productDetail(@PathVariable String slug) {
         return storefrontService.getActiveProductBySlug(slug);
@@ -107,13 +130,19 @@ public class StorefrontController {
 
     @PostMapping("/orders")
     @ResponseStatus(HttpStatus.CREATED)
-    public Order createOrder(@Valid @RequestBody Order order) {
-        return storefrontService.createOrder(order);
+    public CheckoutOrderResponse createOrder(@Valid @RequestBody CreateOrderRequest request) {
+        return storefrontService.createOrder(request);
     }
 
     @PostMapping("/orders/lookup")
     public Order lookupOrder(@Valid @RequestBody OrderLookupRequest request) {
         return storefrontService.lookupOrder(request.orderCode(), request.phoneNumber());
+    }
+
+    @PostMapping("/payments/momo/ipn")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void momoIpn(@Valid @RequestBody MomoIpnRequest request) {
+        storefrontService.handleMomoIpn(request);
     }
 
     public record OrderLookupRequest(

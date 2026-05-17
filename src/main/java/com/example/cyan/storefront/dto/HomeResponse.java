@@ -10,6 +10,7 @@ public class HomeResponse {
     private List<Banner> mainBanners = new ArrayList<>();
     private List<Banner> subBanners = new ArrayList<>();
     private List<CategoryTreeResponse> categories = new ArrayList<>();
+    private List<CollectionSummaryResponse> featuredCollections = new ArrayList<>();
     private List<ProductCardResponse> featuredProducts = new ArrayList<>();
     private List<ProductCardResponse> newArrivals = new ArrayList<>();
     private List<EditorialSummaryResponse> latestEditorials = new ArrayList<>();
@@ -36,6 +37,14 @@ public class HomeResponse {
 
     public void setCategories(List<CategoryTreeResponse> categories) {
         this.categories = categories;
+    }
+
+    public List<CollectionSummaryResponse> getFeaturedCollections() {
+        return featuredCollections;
+    }
+
+    public void setFeaturedCollections(List<CollectionSummaryResponse> featuredCollections) {
+        this.featuredCollections = featuredCollections;
     }
 
     public List<ProductCardResponse> getFeaturedProducts() {

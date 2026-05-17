@@ -19,18 +19,27 @@ import com.example.cyan.catalog.service.ProductService;
 import com.example.cyan.common.exception.ResourceNotFoundException;
 import com.example.cyan.common.model.enums.BannerPlacement;
 import com.example.cyan.common.model.enums.CategoryStatus;
+import com.example.cyan.common.model.enums.CollectionStatus;
 import com.example.cyan.common.model.enums.EditorialStatus;
 import com.example.cyan.common.model.enums.ProductStatus;
 import com.example.cyan.content.model.Banner;
 import com.example.cyan.content.model.Editorial;
+import com.example.cyan.content.model.ProductCollection;
 import com.example.cyan.content.service.BannerService;
 import com.example.cyan.content.service.EditorialService;
+import com.example.cyan.content.service.ProductCollectionService;
+import com.example.cyan.order.dto.CheckoutOrderResponse;
+import com.example.cyan.order.dto.CreateOrderRequest;
+import com.example.cyan.order.dto.MomoIpnRequest;
 import com.example.cyan.order.model.Order;
 import com.example.cyan.order.service.OrderService;
+import com.example.cyan.storefront.dto.CollectionDetailResponse;
+import com.example.cyan.storefront.dto.CollectionSummaryResponse;
 import com.example.cyan.storefront.dto.CategoryTreeResponse;
 import com.example.cyan.storefront.dto.HomeResponse;
 import com.example.cyan.storefront.dto.ProductCatalogResponse;
 import com.example.cyan.storefront.dto.ProductCardResponse;
+import com.example.cyan.storefront.dto.SearchSuggestionResponse;
 
 @Service
 public class StorefrontService {
@@ -39,15 +48,18 @@ public class StorefrontService {
     private final ProductService productService;
     private final BannerService bannerService;
     private final EditorialService editorialService;
+    private final ProductCollectionService productCollectionService;
     private final OrderService orderService;
     private final StorefrontMapper storefrontMapper;
 
     public StorefrontService(CategoryService categoryService, ProductService productService, BannerService bannerService,
-            EditorialService editorialService, OrderService orderService, StorefrontMapper storefrontMapper) {
+            EditorialService editorialService, ProductCollectionService productCollectionService,
+            OrderService orderService, StorefrontMapper storefrontMapper) {
         this.categoryService = categoryService;
         this.productService = productService;
         this.bannerService = bannerService;
         this.editorialService = editorialService;
+        this.productCollectionService = productCollectionService;
         this.orderService = orderService;
         this.storefrontMapper = storefrontMapper;
     }
@@ -57,6 +69,7 @@ public class StorefrontService {
         response.setMainBanners(activeBanners(BannerPlacement.MAIN));
         response.setSubBanners(activeBanners(BannerPlacement.SUB));
         response.setCategories(getCategoryTree());
+        response.setFeaturedCollections(getPublishedCollections(Boolean.TRUE));
         response.setFeaturedProducts(filterActiveProducts(null, null, null, null, true).getItems().stream().limit(8).toList());
         response.setNewArrivals(getNewArrivals(8));
         response.setLatestEditorials(editorialService.findAll(EditorialStatus.PUBLISHED).stream()
@@ -173,8 +186,30 @@ public class StorefrontService {
         return editorial;
     }
 
-    public Order createOrder(Order order) {
-        return orderService.create(order);
+    public List<CollectionSummaryResponse> getPublishedCollections(Boolean featured) {
+        return productCollectionService.findAll(CollectionStatus.PUBLISHED).stream()
+                .filter(collection -> featured == null || collection.isFeatured() == featured.booleanValue())
+                .map(storefrontMapper::toCollectionSummary)
+                .toList();
+    }
+
+    public CollectionDetailResponse getPublishedCollectionBySlug(String slug) {
+        ProductCollection collection = productCollectionService.findBySlug(slug);
+        if (collection.getStatus() != CollectionStatus.PUBLISHED) {
+            throw new ResourceNotFoundException("Collection not found with slug: " + slug);
+        }
+
+        CollectionDetailResponse response = storefrontMapper.toCollectionDetail(collection);
+        response.setProducts(collection.getProductIds().stream()
+                .map(productService::findById)
+                .filter(product -> product.getStatus() == ProductStatus.ACTIVE)
+                .map(storefrontMapper::toProductCard)
+                .toList());
+        return response;
+    }
+
+    public CheckoutOrderResponse createOrder(CreateOrderRequest request) {
+        return orderService.checkout(request);
     }
 
     public Order lookupOrder(String orderCode, String phoneNumber) {
@@ -184,6 +219,20 @@ public class StorefrontService {
             throw new ResourceNotFoundException("Order not found for the provided credentials");
         }
         return order;
+    }
+
+    public void handleMomoIpn(MomoIpnRequest request) {
+        orderService.handleMomoIpn(request);
+    }
+
+    public SearchSuggestionResponse getSearchSuggestions(String keyword, int keywordLimit, int productLimit) {
+        SearchSuggestionResponse response = new SearchSuggestionResponse();
+        response.setKeyword(keyword);
+        response.setKeywordSuggestions(productService.suggestKeywords(keyword, keywordLimit));
+        response.setProductSuggestions(productService.suggestProducts(keyword, productLimit).stream()
+                .map(storefrontMapper::toProductCard)
+                .toList());
+        return response;
     }
 
     private boolean containsIgnoreCase(String value, String keyword) {

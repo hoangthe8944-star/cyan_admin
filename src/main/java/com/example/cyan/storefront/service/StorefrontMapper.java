@@ -7,6 +7,9 @@ import org.springframework.stereotype.Component;
 import com.example.cyan.catalog.model.Category;
 import com.example.cyan.catalog.model.Product;
 import com.example.cyan.content.model.Editorial;
+import com.example.cyan.content.model.ProductCollection;
+import com.example.cyan.storefront.dto.CollectionDetailResponse;
+import com.example.cyan.storefront.dto.CollectionSummaryResponse;
 import com.example.cyan.storefront.dto.CategoryTreeResponse;
 import com.example.cyan.storefront.dto.EditorialSummaryResponse;
 import com.example.cyan.storefront.dto.ProductCardResponse;
@@ -54,6 +57,34 @@ public class StorefrontMapper {
         response.setTopics(editorial.getTopics() == null ? new ArrayList<>() : editorial.getTopics());
         response.setCoverMedia(editorial.getCoverMedia());
         response.setPublishedAt(editorial.getPublishedAt());
+        return response;
+    }
+
+    public CollectionSummaryResponse toCollectionSummary(ProductCollection collection) {
+        CollectionSummaryResponse response = new CollectionSummaryResponse();
+        response.setId(collection.getId());
+        response.setName(collection.getName());
+        response.setSlug(collection.getSlug());
+        response.setSummary(collection.getSummary());
+        response.setCoverMedia(collection.getCoverMedia());
+        response.setFeatured(collection.isFeatured());
+        response.setDisplayOrder(collection.getDisplayOrder());
+        response.setPublishedAt(collection.getPublishedAt());
+        response.setProductCount(collection.getProductIds() == null ? 0 : collection.getProductIds().size());
+        return response;
+    }
+
+    public CollectionDetailResponse toCollectionDetail(ProductCollection collection) {
+        CollectionDetailResponse response = new CollectionDetailResponse();
+        response.setId(collection.getId());
+        response.setName(collection.getName());
+        response.setSlug(collection.getSlug());
+        response.setSummary(collection.getSummary());
+        response.setDescription(collection.getDescription());
+        response.setCoverMedia(collection.getCoverMedia());
+        response.setFeatured(collection.isFeatured());
+        response.setDisplayOrder(collection.getDisplayOrder());
+        response.setPublishedAt(collection.getPublishedAt());
         return response;
     }
 }

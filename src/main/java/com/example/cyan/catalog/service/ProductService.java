@@ -1,10 +1,15 @@
 package com.example.cyan.catalog.service;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 
@@ -37,12 +42,67 @@ public class ProductService {
     public List<Product> findAll(String keyword, String categoryId, ProductStatus status) {
         List<Product> products = status != null ? productRepository.findByStatus(status) : productRepository.findAll();
         return products.stream()
-                .filter(product -> keyword == null || keyword.isBlank()
-                        || product.getName().toLowerCase().contains(keyword.toLowerCase())
-                        || product.getSku().toLowerCase().contains(keyword.toLowerCase()))
+                .filter(product -> matchesKeyword(product, keyword))
                 .filter(product -> categoryId == null || categoryId.isBlank()
                         || product.getCategoryIds().contains(categoryId))
                 .sorted(Comparator.comparing(Product::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    public Product findActiveById(String id) {
+        Product product = findById(id);
+        if (product.getStatus() != ProductStatus.ACTIVE) {
+            throw new ResourceNotFoundException("Product is not active: " + id);
+        }
+        return product;
+    }
+
+    public ProductVariant findVariant(Product product, String variantCode) {
+        return product.getVariants().stream()
+                .filter(ProductVariant::isActive)
+                .filter(variant -> variantCode.equals(variant.getVariantCode()))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Variant not found: " + variantCode));
+    }
+
+    public List<String> suggestKeywords(String keyword, int limit) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        if (normalizedKeyword == null) {
+            return List.of();
+        }
+
+        return findAll(null, null, ProductStatus.ACTIVE).stream()
+                .flatMap(this::keywordCandidates)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .filter(value -> {
+                    String normalizedValue = normalizeKeyword(value);
+                    return normalizedValue != null && normalizedValue.contains(normalizedKeyword);
+                })
+                .collect(Collectors.toCollection(LinkedHashSet::new))
+                .stream()
+                .sorted(Comparator.<String>comparingInt(
+                        value -> suggestionScore(value, normalizedKeyword))
+                        .thenComparingInt(String::length)
+                        .thenComparing(String.CASE_INSENSITIVE_ORDER))
+                .limit(limit)
+                .toList();
+    }
+
+    public List<Product> suggestProducts(String keyword, int limit) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        if (normalizedKeyword == null) {
+            return List.of();
+        }
+
+        return findAll(null, null, ProductStatus.ACTIVE).stream()
+                .filter(product -> matchesKeyword(product, keyword))
+                .sorted(Comparator
+                        .comparingInt((Product product) -> suggestionScore(product.getName(), normalizedKeyword))
+                        .thenComparing(Product::isFeatured, Comparator.reverseOrder())
+                        .thenComparing(Product::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(limit)
                 .toList();
     }
 
@@ -121,5 +181,55 @@ public class ProductService {
             throw new BadRequestException("Slug or name is required");
         }
         return resolved;
+    }
+
+    private boolean matchesKeyword(Product product, String keyword) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        if (normalizedKeyword == null) {
+            return true;
+        }
+
+        return keywordCandidates(product)
+                .filter(Objects::nonNull)
+                .map(this::normalizeKeyword)
+                .filter(Objects::nonNull)
+                .anyMatch(value -> value.contains(normalizedKeyword));
+    }
+
+    private Stream<String> keywordCandidates(Product product) {
+        Stream<String> tags = product.getTags() == null ? Stream.empty() : product.getTags().stream();
+        return Stream.concat(
+                Stream.of(product.getName(), product.getSku(), product.getBrand(), product.getMaterial(),
+                        product.getGemstone(), product.getShortDescription()),
+                tags);
+    }
+
+    private int suggestionScore(String value, String normalizedKeyword) {
+        String normalizedValue = normalizeKeyword(value);
+        if (normalizedValue == null) {
+            return Integer.MAX_VALUE;
+        }
+        if (normalizedValue.equals(normalizedKeyword)) {
+            return 0;
+        }
+        if (normalizedValue.startsWith(normalizedKeyword)) {
+            return 1;
+        }
+        return 2;
+    }
+
+    private String normalizeKeyword(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .replace('đ', 'd')
+                .replace('Đ', 'D')
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", " ")
+                .trim()
+                .replaceAll("\\s+", " ");
+        return normalized.isBlank() ? null : normalized;
     }
 }
