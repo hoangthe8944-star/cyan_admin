@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import com.example.cyan.common.model.BaseDocument;
 import com.example.cyan.common.model.MediaAsset;
 import com.example.cyan.common.model.enums.BannerPlacement;
+import com.example.cyan.common.util.TextSanitizer;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -37,7 +38,7 @@ public class Banner extends BaseDocument {
     @Size(max = 500)
     private String redirectUrl;
 
-    @Size(max = 80)
+    @Size(max = 160)
     private String ctaLabel;
 
     private boolean active = true;
@@ -54,7 +55,7 @@ public class Banner extends BaseDocument {
     }
 
     public void setTitle(String title) {
-        this.title = title;
+        this.title = TextSanitizer.cleanPlainText(title);
     }
 
     public String getSlug() {
@@ -62,7 +63,7 @@ public class Banner extends BaseDocument {
     }
 
     public void setSlug(String slug) {
-        this.slug = slug;
+        this.slug = TextSanitizer.cleanPlainText(slug);
     }
 
     public BannerPlacement getPlacement() {
@@ -86,7 +87,7 @@ public class Banner extends BaseDocument {
     }
 
     public void setRedirectUrl(String redirectUrl) {
-        this.redirectUrl = redirectUrl;
+        this.redirectUrl = TextSanitizer.cleanPlainText(redirectUrl);
     }
 
     public String getCtaLabel() {
@@ -94,7 +95,7 @@ public class Banner extends BaseDocument {
     }
 
     public void setCtaLabel(String ctaLabel) {
-        this.ctaLabel = ctaLabel;
+        this.ctaLabel = TextSanitizer.cleanPlainText(ctaLabel);
     }
 
     public boolean isActive() {
