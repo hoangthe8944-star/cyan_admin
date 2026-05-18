@@ -17,6 +17,15 @@ class TextSanitizerTest {
     }
 
     @Test
+    void preservesWhitespaceForProductShortDescription() {
+        String value = "  Mo ta ngan dong 1.\nMo ta ngan dong 2.  ";
+
+        String sanitized = TextSanitizer.cleanPlainTextPreserveWhitespace(value);
+
+        assertEquals(value, sanitized);
+    }
+
+    @Test
     void preservesWhitespaceForRichTextDescriptions() {
         String value = "  <p>Mo ta dau tien</p>\n  <p>Mo ta thu hai</p>  ";
 

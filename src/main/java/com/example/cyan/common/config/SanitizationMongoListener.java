@@ -57,7 +57,7 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
         product.setName(TextSanitizer.cleanPlainText(product.getName()));
         product.setSlug(TextSanitizer.cleanPlainText(product.getSlug()));
         product.setSku(TextSanitizer.cleanPlainText(product.getSku()));
-        product.setShortDescription(TextSanitizer.cleanPlainText(product.getShortDescription()));
+        product.setShortDescription(TextSanitizer.cleanPlainTextPreserveWhitespace(product.getShortDescription()));
         product.setDescription(TextSanitizer.cleanRichTextPreserveWhitespace(product.getDescription()));
         product.setBrand(TextSanitizer.cleanPlainText(product.getBrand()));
         product.setMaterial(TextSanitizer.cleanPlainText(product.getMaterial()));
