@@ -48,7 +48,7 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
     private void sanitizeCategory(Category category) {
         category.setName(TextSanitizer.cleanPlainText(category.getName()));
         category.setSlug(TextSanitizer.cleanPlainText(category.getSlug()));
-        category.setDescription(TextSanitizer.cleanPlainText(category.getDescription()));
+        category.setDescription(TextSanitizer.cleanPlainTextPreserveWhitespace(category.getDescription()));
         sanitizeMedia(category.getCoverMedia());
         sanitizeSeo(category.getSeo());
     }
@@ -58,7 +58,7 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
         product.setSlug(TextSanitizer.cleanPlainText(product.getSlug()));
         product.setSku(TextSanitizer.cleanPlainText(product.getSku()));
         product.setShortDescription(TextSanitizer.cleanPlainText(product.getShortDescription()));
-        product.setDescription(TextSanitizer.cleanRichText(product.getDescription()));
+        product.setDescription(TextSanitizer.cleanRichTextPreserveWhitespace(product.getDescription()));
         product.setBrand(TextSanitizer.cleanPlainText(product.getBrand()));
         product.setMaterial(TextSanitizer.cleanPlainText(product.getMaterial()));
         product.setGemstone(TextSanitizer.cleanPlainText(product.getGemstone()));
@@ -118,7 +118,7 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
         editorial.setTitle(TextSanitizer.cleanPlainText(editorial.getTitle()));
         editorial.setSlug(TextSanitizer.cleanPlainText(editorial.getSlug()));
         editorial.setSummary(TextSanitizer.cleanPlainText(editorial.getSummary()));
-        editorial.setBody(TextSanitizer.cleanRichText(editorial.getBody()));
+        editorial.setBody(TextSanitizer.cleanRichTextPreserveWhitespace(editorial.getBody()));
         sanitizeMedia(editorial.getCoverMedia());
         sanitizeSeo(editorial.getSeo());
         if (editorial.getTopics() != null) {
@@ -133,7 +133,7 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
         collection.setName(TextSanitizer.cleanPlainText(collection.getName()));
         collection.setSlug(TextSanitizer.cleanPlainText(collection.getSlug()));
         collection.setSummary(TextSanitizer.cleanPlainText(collection.getSummary()));
-        collection.setDescription(TextSanitizer.cleanRichText(collection.getDescription()));
+        collection.setDescription(TextSanitizer.cleanRichTextPreserveWhitespace(collection.getDescription()));
         sanitizeMedia(collection.getCoverMedia());
         sanitizeSeo(collection.getSeo());
         if (collection.getProductIds() != null) {
@@ -146,7 +146,7 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
     private void sanitizeSection(EditorialSection section) {
         section.setHeading(TextSanitizer.cleanPlainText(section.getHeading()));
         section.setSubHeading(TextSanitizer.cleanPlainText(section.getSubHeading()));
-        section.setContent(TextSanitizer.cleanRichText(section.getContent()));
+        section.setContent(TextSanitizer.cleanRichTextPreserveWhitespace(section.getContent()));
         sanitizeMediaList(section.getMedia());
     }
 
@@ -217,7 +217,7 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
             return;
         }
         seo.setTitle(TextSanitizer.cleanPlainText(seo.getTitle()));
-        seo.setDescription(TextSanitizer.cleanPlainText(seo.getDescription()));
+        seo.setDescription(TextSanitizer.cleanPlainTextPreserveWhitespace(seo.getDescription()));
         seo.setKeywords(TextSanitizer.cleanPlainText(seo.getKeywords()));
     }
 
