@@ -1,6 +1,7 @@
 package com.example.cyan.catalog.model;
 
 import com.example.cyan.common.model.MediaAsset;
+import com.example.cyan.common.util.TextSanitizer;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -24,7 +25,7 @@ public class ProductOptionValue {
     }
 
     public void setCode(String code) {
-        this.code = code;
+        this.code = TextSanitizer.cleanPlainText(code);
     }
 
     public String getLabel() {
@@ -32,7 +33,7 @@ public class ProductOptionValue {
     }
 
     public void setLabel(String label) {
-        this.label = label;
+        this.label = TextSanitizer.cleanPlainText(label);
     }
 
     public MediaAsset getSwatchMedia() {

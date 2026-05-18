@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.example.cyan.common.model.MediaAsset;
+import com.example.cyan.common.util.TextSanitizer;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -56,7 +57,7 @@ public class ProductVariant {
     }
 
     public void setVariantCode(String variantCode) {
-        this.variantCode = variantCode;
+        this.variantCode = TextSanitizer.cleanPlainText(variantCode);
     }
 
     public String getModelCode() {
@@ -64,7 +65,7 @@ public class ProductVariant {
     }
 
     public void setModelCode(String modelCode) {
-        this.modelCode = modelCode;
+        this.modelCode = TextSanitizer.cleanPlainText(modelCode);
     }
 
     public String getStyleCode() {
@@ -72,7 +73,7 @@ public class ProductVariant {
     }
 
     public void setStyleCode(String styleCode) {
-        this.styleCode = styleCode;
+        this.styleCode = TextSanitizer.cleanPlainText(styleCode);
     }
 
     public List<VariantSelection> getSelections() {

@@ -1,6 +1,7 @@
 package com.example.cyan.catalog.model;
 
 import com.example.cyan.common.model.enums.ProductOptionType;
+import com.example.cyan.common.util.TextSanitizer;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -32,7 +33,7 @@ public class VariantSelection {
     }
 
     public void setValueCode(String valueCode) {
-        this.valueCode = valueCode;
+        this.valueCode = TextSanitizer.cleanPlainText(valueCode);
     }
 
     public String getValueLabel() {
@@ -40,6 +41,6 @@ public class VariantSelection {
     }
 
     public void setValueLabel(String valueLabel) {
-        this.valueLabel = valueLabel;
+        this.valueLabel = TextSanitizer.cleanPlainText(valueLabel);
     }
 }

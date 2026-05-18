@@ -1,0 +1,31 @@
+package com.example.cyan.catalog.model;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+import org.junit.jupiter.api.Test;
+
+class ProductVariantTest {
+
+    @Test
+    void trimsCodesBeforeValidationWouldRun() {
+        ProductVariant variant = new ProductVariant();
+
+        variant.setVariantCode("  VAR-001  ");
+        variant.setModelCode("  MODEL-01  ");
+        variant.setStyleCode("  STYLE-01  ");
+
+        assertEquals("VAR-001", variant.getVariantCode());
+        assertEquals("MODEL-01", variant.getModelCode());
+        assertEquals("STYLE-01", variant.getStyleCode());
+    }
+
+    @Test
+    void clearsBlankVariantCode() {
+        ProductVariant variant = new ProductVariant();
+
+        variant.setVariantCode("   ");
+
+        assertNull(variant.getVariantCode());
+    }
+}
