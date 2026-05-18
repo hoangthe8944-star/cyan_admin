@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -145,8 +146,17 @@ public class ProductService {
             throw new BadRequestException("Product must support both MODEL and STYLE options");
         }
 
-        if (product.getVariants().stream().map(ProductVariant::getVariantCode).anyMatch(Objects::isNull)) {
-            throw new BadRequestException("Each variant must have a variantCode");
+        product.getVariants().forEach(this::prepareVariant);
+
+        boolean duplicateVariantCode = product.getVariants().stream()
+                .map(ProductVariant::getVariantCode)
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(code -> code, Collectors.counting()))
+                .values()
+                .stream()
+                .anyMatch(count -> count > 1);
+        if (duplicateVariantCode) {
+            throw new BadRequestException("Generated variantCode must be unique");
         }
 
         product.setSlug(resolveSlug(product.getSlug(), product.getName()));
@@ -170,6 +180,57 @@ public class ProductService {
         if (product.getStatus() == ProductStatus.ACTIVE && product.getPublishedAt() == null) {
             product.setPublishedAt(Instant.now());
         }
+    }
+
+    private void prepareVariant(ProductVariant variant) {
+        if (variant == null) {
+            throw new BadRequestException("Variant is required");
+        }
+
+        String generatedVariantCode = generateVariantCode(variant);
+        if (generatedVariantCode == null) {
+            throw new BadRequestException("Each variant must provide modelCode and styleCode");
+        }
+        variant.setVariantCode(generatedVariantCode);
+    }
+
+    private String generateVariantCode(ProductVariant variant) {
+        String modelCode = normalizeVariantToken(variant.getModelCode());
+        String styleCode = normalizeVariantToken(variant.getStyleCode());
+        if (modelCode == null || styleCode == null) {
+            return null;
+        }
+
+        String selectionSegment = variant.getSelections() == null ? null : variant.getSelections().stream()
+                .filter(Objects::nonNull)
+                .map(selection -> normalizeVariantToken(selection.getValueCode()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.joining("-"));
+
+        String baseCode = Stream.of(modelCode, styleCode, selectionSegment)
+                .filter(Objects::nonNull)
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.joining("-"));
+
+        if (baseCode.length() <= 180) {
+            return baseCode;
+        }
+
+        String hash = HexFormat.of().toHexDigits(baseCode.hashCode()).toUpperCase(Locale.ROOT);
+        int maxBaseLength = 180 - hash.length() - 1;
+        return baseCode.substring(0, Math.max(maxBaseLength, 1)) + "-" + hash;
+    }
+
+    private String normalizeVariantToken(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim()
+                .replaceAll("\\s+", "-")
+                .replaceAll("[^A-Za-z0-9_-]+", "-")
+                .replaceAll("-{2,}", "-")
+                .replaceAll("(^-|-$)", "")
+                .toUpperCase(Locale.ROOT);
     }
 
     private String resolveSlug(String slug, String fallbackName) {

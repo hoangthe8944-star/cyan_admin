@@ -28,4 +28,13 @@ class ProductVariantTest {
 
         assertNull(variant.getVariantCode());
     }
+
+    @Test
+    void keepsLargeIncomingVariantCodeUnvalidatedAtModelLevel() {
+        ProductVariant variant = new ProductVariant();
+
+        variant.setVariantCode("X".repeat(300));
+
+        assertEquals("X".repeat(300), variant.getVariantCode());
+    }
 }

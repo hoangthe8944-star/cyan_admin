@@ -16,8 +16,6 @@ import jakarta.validation.constraints.Size;
 
 public class ProductVariant {
 
-    @NotBlank
-    @Size(max = 180)
     private String variantCode;
 
     @NotBlank
