@@ -83,9 +83,16 @@ public class MomoPaymentService {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             String body = response.body();
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new BadRequestException(
+                        "MoMo create payment failed: HTTP " + response.statusCode() + " - "
+                                + messageOrDefault(extractString(body, "message"), "Unknown MoMo error"));
+            }
             int resultCode = intValue(extractNumber(body, "resultCode"));
             if (resultCode != 0 && resultCode != 1000) {
-                throw new BadRequestException("MoMo create payment failed: " + extractString(body, "message"));
+                throw new BadRequestException(
+                        "MoMo create payment failed: " + messageOrDefault(extractString(body, "message"),
+                                "Unknown MoMo error"));
             }
 
             return new MomoCreatePaymentResponse(
@@ -95,11 +102,14 @@ public class MomoPaymentService {
                     extractString(body, "message"),
                     resultCode,
                     longValue(extractNumber(body, "responseTime")));
+        } catch (BadRequestException ex) {
+            throw ex;
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new BadRequestException("Unable to connect to MoMo payment gateway");
         } catch (Exception ex) {
-            throw new BadRequestException("Unable to connect to MoMo payment gateway");
+            throw new BadRequestException(
+                    "Unable to connect to MoMo payment gateway: " + messageOrDefault(ex.getMessage(), ex.getClass().getSimpleName()));
         }
     }
 
@@ -225,6 +235,10 @@ public class MomoPaymentService {
 
     private String defaultString(String value) {
         return value == null ? "" : value;
+    }
+
+    private String messageOrDefault(String value, String fallback) {
+        return isBlank(value) ? fallback : value;
     }
 
     private String extractString(String json, String key) {

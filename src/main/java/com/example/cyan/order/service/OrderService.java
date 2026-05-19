@@ -77,6 +77,8 @@ public class OrderService {
             throw new BadRequestException("This order does not contain MoMo payment metadata");
         }
 
+        maybeRestoreStockForFailedMomo(order, paymentStatus);
+
         order.getMomoPayment().setResultCode(resultCode);
         order.getMomoPayment().setTransId(transId);
         order.getMomoPayment().setMessage(message);
@@ -155,20 +157,31 @@ public class OrderService {
         response.setPaymentRequired(savedOrder.getPaymentMethod() == PaymentMethod.MOMO);
 
         if (savedOrder.getPaymentMethod() == PaymentMethod.MOMO) {
-            MomoPaymentService.MomoCreatePaymentResponse momoResponse = momoPaymentService.createPayment(savedOrder,
-                    request.getMomoPayment());
-            savedOrder.getMomoPayment().setPayUrl(momoResponse.payUrl());
-            savedOrder.getMomoPayment().setDeeplink(momoResponse.deeplink());
-            savedOrder.getMomoPayment().setQrCodeUrl(momoResponse.qrCodeUrl());
-            savedOrder.getMomoPayment().setMessage(momoResponse.message());
-            savedOrder.getMomoPayment().setResultCode(momoResponse.resultCode());
-            savedOrder.getMomoPayment().setResponseTime(momoResponse.responseTime() == null ? null
-                    : Instant.ofEpochMilli(momoResponse.responseTime()));
-            savedOrder = orderRepository.save(savedOrder);
-            response.setOrder(savedOrder);
-            response.setPayUrl(momoResponse.payUrl());
-            response.setDeeplink(momoResponse.deeplink());
-            response.setQrCodeUrl(momoResponse.qrCodeUrl());
+            try {
+                MomoPaymentService.MomoCreatePaymentResponse momoResponse = momoPaymentService.createPayment(savedOrder,
+                        request.getMomoPayment());
+                savedOrder.getMomoPayment().setPayUrl(momoResponse.payUrl());
+                savedOrder.getMomoPayment().setDeeplink(momoResponse.deeplink());
+                savedOrder.getMomoPayment().setQrCodeUrl(momoResponse.qrCodeUrl());
+                savedOrder.getMomoPayment().setMessage(momoResponse.message());
+                savedOrder.getMomoPayment().setResultCode(momoResponse.resultCode());
+                savedOrder.getMomoPayment().setResponseTime(momoResponse.responseTime() == null ? null
+                        : Instant.ofEpochMilli(momoResponse.responseTime()));
+                savedOrder = orderRepository.save(savedOrder);
+                response.setOrder(savedOrder);
+                response.setPayUrl(momoResponse.payUrl());
+                response.setDeeplink(momoResponse.deeplink());
+                response.setQrCodeUrl(momoResponse.qrCodeUrl());
+            } catch (RuntimeException ex) {
+                restoreStock(order);
+                savedOrder.setPaymentStatus(PaymentStatus.FAILED);
+                if (savedOrder.getMomoPayment() != null) {
+                    savedOrder.getMomoPayment().setMessage(ex.getMessage());
+                    savedOrder.getMomoPayment().setResponseTime(Instant.now());
+                }
+                orderRepository.save(savedOrder);
+                throw ex;
+            }
         }
 
         return response;
@@ -191,11 +204,13 @@ public class OrderService {
             throw new BadRequestException("MoMo amount mismatch");
         }
 
+        PaymentStatus nextPaymentStatus = resolvePaymentStatus(request.getResultCode());
+        maybeRestoreStockForFailedMomo(order, nextPaymentStatus);
         order.getMomoPayment().setMessage(request.getMessage());
         order.getMomoPayment().setTransId(request.getTransId());
         order.getMomoPayment().setResultCode(request.getResultCode());
         order.getMomoPayment().setResponseTime(Instant.ofEpochMilli(request.getResponseTime()));
-        order.setPaymentStatus(resolvePaymentStatus(request.getResultCode()));
+        order.setPaymentStatus(nextPaymentStatus);
         if (request.getResultCode() == 0) {
             order.setOrderStatus(OrderStatus.PAID);
         }
@@ -267,6 +282,35 @@ public class OrderService {
             return PaymentStatus.PENDING;
         }
         return PaymentStatus.FAILED;
+    }
+
+    private void maybeRestoreStockForFailedMomo(Order order, PaymentStatus nextPaymentStatus) {
+        if (order.getPaymentMethod() != PaymentMethod.MOMO || nextPaymentStatus != PaymentStatus.FAILED) {
+            return;
+        }
+
+        if (order.getPaymentStatus() != PaymentStatus.PENDING && order.getPaymentStatus() != PaymentStatus.UNPAID) {
+            return;
+        }
+
+        restoreStock(order);
+    }
+
+    private void restoreStock(Order order) {
+        Map<String, Product> touchedProducts = new LinkedHashMap<>();
+
+        order.getItems().forEach(item -> {
+            Product product = touchedProducts.computeIfAbsent(item.getProductId(), productService::findById);
+            ProductVariant variant = product.getVariants().stream()
+                    .filter(candidate -> item.getVariantCode().equals(candidate.getVariantCode()))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Variant not found: " + item.getVariantCode()));
+
+            variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
+            product.setTotalStock(product.getVariants().stream().mapToInt(ProductVariant::getStockQuantity).sum());
+        });
+
+        touchedProducts.values().forEach(productRepository::save);
     }
 
     private BigDecimal normalizeLineTotal(OrderItem item) {
