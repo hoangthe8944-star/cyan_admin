@@ -246,7 +246,7 @@ public class OrderService {
         if (order.getPaymentMethod() == PaymentMethod.MOMO && order.getMomoPayment() != null) {
             order.getMomoPayment().setAmount(totalAmount.setScale(0, RoundingMode.HALF_UP).longValue());
             order.getMomoPayment().setOrderInfo(order.getMomoPayment().getOrderInfo() == null
-                    ? "Thanh toan don hang " + order.getOrderCode()
+                    ? "Thanh toan don hang OrivenJewelry " + order.getOrderCode()
                     : order.getMomoPayment().getOrderInfo());
             order.getMomoPayment().setMomoOrderId(order.getMomoPayment().getMomoOrderId() == null
                     ? order.getOrderCode()
