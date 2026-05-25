@@ -11,6 +11,8 @@ import com.example.cyan.catalog.model.ProductOption;
 import com.example.cyan.catalog.model.ProductOptionValue;
 import com.example.cyan.catalog.model.ProductVariant;
 import com.example.cyan.catalog.model.VariantSelection;
+import com.example.cyan.chat.model.ChatConversation;
+import com.example.cyan.chat.model.ChatMessage;
 import com.example.cyan.common.model.MediaAsset;
 import com.example.cyan.common.model.SeoMetadata;
 import com.example.cyan.common.util.TextSanitizer;
@@ -42,6 +44,8 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
             sanitizeCollection(collection);
         } else if (source instanceof Order order) {
             sanitizeOrder(order);
+        } else if (source instanceof ChatConversation conversation) {
+            sanitizeChatConversation(conversation);
         }
     }
 
@@ -210,6 +214,29 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
         momoPayment.setExtraData(TextSanitizer.cleanPlainText(momoPayment.getExtraData()));
         momoPayment.setLang(TextSanitizer.cleanPlainText(momoPayment.getLang()));
         momoPayment.setMessage(TextSanitizer.cleanPlainText(momoPayment.getMessage()));
+    }
+
+    private void sanitizeChatConversation(ChatConversation conversation) {
+        conversation.setConversationCode(TextSanitizer.cleanPlainText(conversation.getConversationCode()));
+        conversation.setCustomerName(TextSanitizer.cleanPlainText(conversation.getCustomerName()));
+        conversation.setCustomerEmail(TextSanitizer.cleanPlainText(conversation.getCustomerEmail()));
+        conversation.setCustomerPhone(TextSanitizer.cleanPlainText(conversation.getCustomerPhone()));
+        conversation.setSubject(TextSanitizer.cleanPlainTextPreserveWhitespace(conversation.getSubject()));
+        conversation.setAssignedAdminName(TextSanitizer.cleanPlainText(conversation.getAssignedAdminName()));
+        conversation.setLastMessagePreview(TextSanitizer.cleanPlainTextPreserveWhitespace(conversation.getLastMessagePreview()));
+        if (conversation.getMessages() != null) {
+            conversation.getMessages().forEach(this::sanitizeChatMessage);
+        }
+    }
+
+    private void sanitizeChatMessage(ChatMessage message) {
+        if (message == null) {
+            return;
+        }
+        message.setSenderName(TextSanitizer.cleanPlainText(message.getSenderName()));
+        message.setSenderEmail(TextSanitizer.cleanPlainText(message.getSenderEmail()));
+        message.setSenderPhone(TextSanitizer.cleanPlainText(message.getSenderPhone()));
+        message.setContent(TextSanitizer.cleanPlainTextPreserveWhitespace(message.getContent()));
     }
 
     private void sanitizeSeo(SeoMetadata seo) {
