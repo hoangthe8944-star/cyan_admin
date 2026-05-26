@@ -37,7 +37,7 @@ public class ProductService {
 
     public Product create(Product product) {
         prepareProduct(product);
-        return productRepository.save(product);
+        return attachProductDetailsToVariants(productRepository.save(product));
     }
 
     public List<Product> findAll(String keyword, String categoryId, ProductStatus status) {
@@ -47,6 +47,7 @@ public class ProductService {
                 .filter(product -> categoryId == null || categoryId.isBlank()
                         || product.getCategoryIds().contains(categoryId))
                 .sorted(Comparator.comparing(Product::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(this::attachProductDetailsToVariants)
                 .toList();
     }
 
@@ -109,11 +110,13 @@ public class ProductService {
 
     public Product findById(String id) {
         return productRepository.findById(id)
+                .map(this::attachProductDetailsToVariants)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
     }
 
     public Product findBySlug(String slug) {
         return productRepository.findBySlug(slug)
+                .map(this::attachProductDetailsToVariants)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with slug: " + slug));
     }
 
@@ -123,7 +126,7 @@ public class ProductService {
         product.setCreatedAt(existing.getCreatedAt());
         product.setVersion(existing.getVersion());
         prepareProduct(product);
-        return productRepository.save(product);
+        return attachProductDetailsToVariants(productRepository.save(product));
     }
 
     public void delete(String id) {
@@ -146,7 +149,7 @@ public class ProductService {
             throw new BadRequestException("Product must support both MODEL and STYLE options");
         }
 
-        product.getVariants().forEach(this::prepareVariant);
+        product.getVariants().forEach(variant -> prepareVariant(product.getName(), product.getDescription(), variant));
 
         boolean duplicateVariantCode = product.getVariants().stream()
                 .map(ProductVariant::getVariantCode)
@@ -182,16 +185,31 @@ public class ProductService {
         }
     }
 
-    private void prepareVariant(ProductVariant variant) {
+    private void prepareVariant(String productName, String fullDescription, ProductVariant variant) {
         if (variant == null) {
             throw new BadRequestException("Variant is required");
         }
 
+        variant.setProductName(productName);
+        variant.setFullDescription(fullDescription);
         String generatedVariantCode = generateVariantCode(variant);
         if (generatedVariantCode == null) {
             throw new BadRequestException("Each variant must provide modelCode and styleCode");
         }
         variant.setVariantCode(generatedVariantCode);
+    }
+
+    private Product attachProductDetailsToVariants(Product product) {
+        if (product == null || product.getVariants() == null) {
+            return product;
+        }
+        product.getVariants().forEach(variant -> {
+            if (variant != null) {
+                variant.setProductName(product.getName());
+                variant.setFullDescription(product.getDescription());
+            }
+        });
+        return product;
     }
 
     private String generateVariantCode(ProductVariant variant) {

@@ -96,6 +96,8 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
         }
         variants.forEach(variant -> {
             variant.setVariantCode(TextSanitizer.cleanPlainText(variant.getVariantCode()));
+            variant.setProductName(TextSanitizer.cleanPlainText(variant.getProductName()));
+            variant.setFullDescription(TextSanitizer.cleanRichTextPreserveWhitespace(variant.getFullDescription()));
             variant.setModelCode(TextSanitizer.cleanPlainText(variant.getModelCode()));
             variant.setStyleCode(TextSanitizer.cleanPlainText(variant.getStyleCode()));
             sanitizeMediaList(variant.getMedia());

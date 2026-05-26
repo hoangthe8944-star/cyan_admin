@@ -18,6 +18,11 @@ public class ProductVariant {
 
     private String variantCode;
 
+    @Size(max = 120)
+    private String productName;
+
+    private String fullDescription;
+
     @NotBlank
     @Size(max = 180)
     private String modelCode;
@@ -56,6 +61,22 @@ public class ProductVariant {
 
     public void setVariantCode(String variantCode) {
         this.variantCode = TextSanitizer.cleanPlainText(variantCode);
+    }
+
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        this.productName = TextSanitizer.cleanPlainText(productName);
+    }
+
+    public String getFullDescription() {
+        return fullDescription;
+    }
+
+    public void setFullDescription(String fullDescription) {
+        this.fullDescription = TextSanitizer.cleanRichTextPreserveWhitespace(fullDescription);
     }
 
     public String getModelCode() {
