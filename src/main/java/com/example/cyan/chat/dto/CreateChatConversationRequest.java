@@ -6,6 +6,9 @@ import jakarta.validation.constraints.Size;
 
 public class CreateChatConversationRequest {
 
+    @Size(max = 80)
+    private String customerUserId;
+
     @NotBlank
     @Size(max = 120)
     private String customerName;
@@ -23,6 +26,14 @@ public class CreateChatConversationRequest {
     @NotBlank
     @Size(max = 2000)
     private String message;
+
+    public String getCustomerUserId() {
+        return customerUserId;
+    }
+
+    public void setCustomerUserId(String customerUserId) {
+        this.customerUserId = customerUserId;
+    }
 
     public String getCustomerName() {
         return customerName;

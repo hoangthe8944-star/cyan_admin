@@ -2,7 +2,11 @@ package com.example.cyan.chat.service;
 
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.data.domain.Sort;
@@ -19,6 +23,8 @@ import com.example.cyan.common.exception.BadRequestException;
 import com.example.cyan.common.exception.ResourceNotFoundException;
 import com.example.cyan.common.model.enums.ChatConversationStatus;
 import com.example.cyan.common.model.enums.ChatSenderType;
+import com.example.cyan.user.model.User;
+import com.example.cyan.user.repository.UserRepository;
 
 @Service
 public class ChatService {
@@ -26,23 +32,27 @@ public class ChatService {
     private static final int PREVIEW_LENGTH = 240;
 
     private final ChatConversationRepository chatConversationRepository;
+    private final UserRepository userRepository;
 
-    public ChatService(ChatConversationRepository chatConversationRepository) {
+    public ChatService(ChatConversationRepository chatConversationRepository, UserRepository userRepository) {
         this.chatConversationRepository = chatConversationRepository;
+        this.userRepository = userRepository;
     }
 
     public ChatConversationDetailResponse createConversation(CreateChatConversationRequest request) {
         ChatConversation conversation = new ChatConversation();
         conversation.setConversationCode(generateConversationCode());
-        conversation.setCustomerName(request.getCustomerName());
-        conversation.setCustomerEmail(request.getCustomerEmail());
+        User customerUser = resolveCustomerUser(request.getCustomerUserId());
+        conversation.setCustomerUserId(customerUser != null ? customerUser.getId() : null);
+        conversation.setCustomerName(customerUser != null ? customerUser.getFullName() : request.getCustomerName());
+        conversation.setCustomerEmail(customerUser != null ? customerUser.getEmail() : request.getCustomerEmail());
         conversation.setCustomerPhone(request.getCustomerPhone());
         conversation.setSubject(request.getSubject());
         conversation.setStatus(ChatConversationStatus.PENDING_ADMIN);
 
         appendMessage(conversation, buildCustomerMessage(
-                request.getCustomerName(),
-                request.getCustomerEmail(),
+                conversation.getCustomerName(),
+                conversation.getCustomerEmail(),
                 request.getCustomerPhone(),
                 request.getMessage()));
 
@@ -57,8 +67,19 @@ public class ChatService {
                 .toList();
     }
 
+    public List<ChatConversationSummaryResponse> findByCustomerUserId(String customerUserId) {
+        User customerUser = findCustomerUser(customerUserId);
+        return findConversationsForCustomer(customerUser).stream()
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
     public ChatConversationDetailResponse findDetailById(String id) {
         return toDetailResponse(findEntityById(id));
+    }
+
+    public ChatConversationDetailResponse findDetailByIdForCustomer(String customerUserId, String conversationId) {
+        return toDetailResponse(findEntityByIdForCustomer(customerUserId, conversationId));
     }
 
     public ChatConversationDetailResponse findDetailByCode(String conversationCode) {
@@ -67,6 +88,18 @@ public class ChatService {
 
     public ChatConversationDetailResponse addCustomerMessage(String conversationId, String message) {
         ChatConversation conversation = findEntityById(conversationId);
+        ensureConversationOpen(conversation);
+        appendMessage(conversation, buildCustomerMessage(
+                conversation.getCustomerName(),
+                conversation.getCustomerEmail(),
+                conversation.getCustomerPhone(),
+                message));
+        conversation.setStatus(ChatConversationStatus.PENDING_ADMIN);
+        return toDetailResponse(chatConversationRepository.save(conversation));
+    }
+
+    public ChatConversationDetailResponse addCustomerMessageForCustomer(String customerUserId, String conversationId, String message) {
+        ChatConversation conversation = findEntityByIdForCustomer(customerUserId, conversationId);
         ensureConversationOpen(conversation);
         appendMessage(conversation, buildCustomerMessage(
                 conversation.getCustomerName(),
@@ -112,6 +145,15 @@ public class ChatService {
 
     public ChatConversationDetailResponse markReadByCustomer(String conversationId) {
         ChatConversation conversation = findEntityById(conversationId);
+        return markConversationReadByCustomer(conversation);
+    }
+
+    public ChatConversationDetailResponse markReadByCustomer(String customerUserId, String conversationId) {
+        ChatConversation conversation = findEntityByIdForCustomer(customerUserId, conversationId);
+        return markConversationReadByCustomer(conversation);
+    }
+
+    private ChatConversationDetailResponse markConversationReadByCustomer(ChatConversation conversation) {
         Instant now = Instant.now();
         conversation.getMessages().stream()
                 .filter(message -> message.getSenderType() == ChatSenderType.ADMIN)
@@ -130,6 +172,55 @@ public class ChatService {
         return chatConversationRepository.findByConversationCode(conversationCode)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Chat conversation not found with code: " + conversationCode));
+    }
+
+    private ChatConversation findEntityByIdForCustomer(String customerUserId, String conversationId) {
+        User customerUser = findCustomerUser(customerUserId);
+        ChatConversation conversation = findEntityById(conversationId);
+        if (!belongsToCustomer(conversation, customerUser)) {
+            throw new ResourceNotFoundException("Chat conversation not found for user: " + conversationId);
+        }
+        return conversation;
+    }
+
+    private User findCustomerUser(String customerUserId) {
+        return userRepository.findById(customerUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + customerUserId));
+    }
+
+    private User resolveCustomerUser(String customerUserId) {
+        if (customerUserId == null || customerUserId.isBlank()) {
+            return null;
+        }
+        return findCustomerUser(customerUserId);
+    }
+
+    private List<ChatConversation> findConversationsForCustomer(User customerUser) {
+        Sort sort = Sort.by(Sort.Order.desc("lastMessageAt"), Sort.Order.desc("createdAt"));
+        Map<String, ChatConversation> conversationsById = new LinkedHashMap<>();
+        chatConversationRepository.findByCustomerUserId(customerUser.getId(), sort)
+                .forEach(conversation -> conversationsById.put(conversation.getId(), conversation));
+        if (customerUser.getEmail() != null && !customerUser.getEmail().isBlank()) {
+            chatConversationRepository.findByCustomerEmailIgnoreCase(customerUser.getEmail(), sort)
+                    .forEach(conversation -> {
+                        if (belongsToCustomer(conversation, customerUser)) {
+                            conversationsById.putIfAbsent(conversation.getId(), conversation);
+                        }
+                    });
+        }
+        return conversationsById.values().stream()
+                .sorted(Comparator.comparing(ChatConversation::getLastMessageAt,
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(ChatConversation::getCreatedAt,
+                                Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    private boolean belongsToCustomer(ChatConversation conversation, User customerUser) {
+        if (conversation.getCustomerUserId() != null && !conversation.getCustomerUserId().isBlank()) {
+            return conversation.getCustomerUserId().equals(customerUser.getId());
+        }
+        return Objects.equals(normalizeEmail(conversation.getCustomerEmail()), normalizeEmail(customerUser.getEmail()));
     }
 
     private void ensureConversationOpen(ChatConversation conversation) {
@@ -188,6 +279,7 @@ public class ChatService {
                 conversation.getId(),
                 conversation.getConversationCode(),
                 conversation.getCustomerName(),
+                conversation.getCustomerUserId(),
                 conversation.getCustomerEmail(),
                 conversation.getCustomerPhone(),
                 conversation.getSubject(),
@@ -206,6 +298,7 @@ public class ChatService {
                 conversation.getId(),
                 conversation.getConversationCode(),
                 conversation.getCustomerName(),
+                conversation.getCustomerUserId(),
                 conversation.getCustomerEmail(),
                 conversation.getCustomerPhone(),
                 conversation.getSubject(),
@@ -229,5 +322,9 @@ public class ChatService {
                                 message.getReadByAdminAt(),
                                 message.getReadByCustomerAt()))
                         .toList());
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 }

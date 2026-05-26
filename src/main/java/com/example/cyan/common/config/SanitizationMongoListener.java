@@ -221,6 +221,7 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
     private void sanitizeChatConversation(ChatConversation conversation) {
         conversation.setConversationCode(TextSanitizer.cleanPlainText(conversation.getConversationCode()));
         conversation.setCustomerName(TextSanitizer.cleanPlainText(conversation.getCustomerName()));
+        conversation.setCustomerUserId(TextSanitizer.cleanPlainText(conversation.getCustomerUserId()));
         conversation.setCustomerEmail(TextSanitizer.cleanPlainText(conversation.getCustomerEmail()));
         conversation.setCustomerPhone(TextSanitizer.cleanPlainText(conversation.getCustomerPhone()));
         conversation.setSubject(TextSanitizer.cleanPlainTextPreserveWhitespace(conversation.getSubject()));

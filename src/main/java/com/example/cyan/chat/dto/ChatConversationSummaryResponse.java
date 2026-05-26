@@ -8,6 +8,7 @@ public record ChatConversationSummaryResponse(
         String id,
         String conversationCode,
         String customerName,
+        String customerUserId,
         String customerEmail,
         String customerPhone,
         String subject,

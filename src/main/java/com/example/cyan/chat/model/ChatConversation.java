@@ -28,6 +28,9 @@ public class ChatConversation extends BaseDocument {
     @Size(max = 120)
     private String customerName;
 
+    @Size(max = 80)
+    private String customerUserId;
+
     @Email
     @Size(max = 160)
     private String customerEmail;
@@ -72,6 +75,14 @@ public class ChatConversation extends BaseDocument {
 
     public void setCustomerName(String customerName) {
         this.customerName = customerName;
+    }
+
+    public String getCustomerUserId() {
+        return customerUserId;
+    }
+
+    public void setCustomerUserId(String customerUserId) {
+        this.customerUserId = customerUserId;
     }
 
     public String getCustomerEmail() {

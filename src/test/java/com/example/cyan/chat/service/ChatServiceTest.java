@@ -22,6 +22,9 @@ import com.example.cyan.chat.repository.ChatConversationRepository;
 import com.example.cyan.common.exception.BadRequestException;
 import com.example.cyan.common.model.enums.ChatConversationStatus;
 import com.example.cyan.common.model.enums.ChatSenderType;
+import com.example.cyan.common.model.enums.UserRole;
+import com.example.cyan.user.model.User;
+import com.example.cyan.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ChatServiceTest {
@@ -29,11 +32,14 @@ class ChatServiceTest {
     @Mock
     private ChatConversationRepository chatConversationRepository;
 
+    @Mock
+    private UserRepository userRepository;
+
     private ChatService chatService;
 
     @BeforeEach
     void setUp() {
-        chatService = new ChatService(chatConversationRepository);
+        chatService = new ChatService(chatConversationRepository, userRepository);
     }
 
     @Test
@@ -62,6 +68,38 @@ class ChatServiceTest {
         assertEquals(0, response.unreadCustomerCount());
         assertEquals(1, response.messages().size());
         assertEquals(ChatSenderType.CUSTOMER, response.messages().get(0).senderType());
+    }
+
+    @Test
+    void createConversationForLoggedInUserLinksConversationToUser() {
+        User user = new User();
+        user.setId("user-1");
+        user.setEmail("ngoc@example.com");
+        user.setFullName("Ngoc The");
+        user.setRole(UserRole.CUSTOMER);
+
+        when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(chatConversationRepository.save(any(ChatConversation.class))).thenAnswer(invocation -> {
+            ChatConversation conversation = invocation.getArgument(0);
+            conversation.setId("chat-2");
+            conversation.setCreatedAt(Instant.now());
+            conversation.setUpdatedAt(Instant.now());
+            return conversation;
+        });
+
+        CreateChatConversationRequest request = new CreateChatConversationRequest();
+        request.setCustomerUserId("user-1");
+        request.setCustomerName("Ignored Name");
+        request.setCustomerEmail("ignored@example.com");
+        request.setCustomerPhone("0123");
+        request.setSubject("Hoi bao hanh");
+        request.setMessage("Cho minh hoi tinh trang don hang");
+
+        var response = chatService.createConversation(request);
+
+        assertEquals("user-1", response.customerUserId());
+        assertEquals("Ngoc The", response.customerName());
+        assertEquals("ngoc@example.com", response.customerEmail());
     }
 
     @Test
