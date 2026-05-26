@@ -138,18 +138,23 @@ public class ProductService {
         if (categoryRepository.findById(product.getPrimaryCategoryId()).isEmpty()) {
             throw new BadRequestException("Primary category does not exist");
         }
-        boolean invalidCategory = product.getCategoryIds().stream().anyMatch(categoryId -> categoryRepository.findById(categoryId).isEmpty());
+        boolean invalidCategory = product.getCategoryIds().stream()
+                .anyMatch(categoryId -> categoryRepository.findById(categoryId).isEmpty());
         if (invalidCategory) {
             throw new BadRequestException("One or more categoryIds do not exist");
         }
 
-        boolean hasModelOption = product.getOptions().stream().anyMatch(option -> option.getType() == ProductOptionType.MODEL);
-        boolean hasStyleOption = product.getOptions().stream().anyMatch(option -> option.getType() == ProductOptionType.STYLE);
+        boolean hasModelOption = product.getOptions().stream()
+                .anyMatch(option -> option.getType() == ProductOptionType.MODEL);
+        boolean hasStyleOption = product.getOptions().stream()
+                .anyMatch(option -> option.getType() == ProductOptionType.STYLE);
         if (!hasModelOption || !hasStyleOption) {
             throw new BadRequestException("Product must support both MODEL and STYLE options");
         }
 
-        product.getVariants().forEach(variant -> prepareVariant(product.getName(), product.getDescription(), variant));
+        for (int i = 0; i < product.getVariants().size(); i++) {
+            prepareVariant(product.getName(), product.getDescription(), product.getVariants().get(i), i);
+        }
 
         boolean duplicateVariantCode = product.getVariants().stream()
                 .map(ProductVariant::getVariantCode)
@@ -185,13 +190,19 @@ public class ProductService {
         }
     }
 
-    private void prepareVariant(String productName, String fullDescription, ProductVariant variant) {
+    private void prepareVariant(String productName, String fullDescription, ProductVariant variant, int index) {
         if (variant == null) {
             throw new BadRequestException("Variant is required");
         }
 
-        variant.setProductName(productName);
-        variant.setFullDescription(fullDescription);
+        if (variant.getProductName() == null || variant.getProductName().isBlank()) {
+            variant.setProductName(productName);
+        }
+
+        if ((variant.getFullDescription() == null || variant.getFullDescription().isBlank()) && index == 0) {
+            variant.setFullDescription(fullDescription);
+        }
+
         String generatedVariantCode = generateVariantCode(variant);
         if (generatedVariantCode == null) {
             throw new BadRequestException("Each variant must provide modelCode and styleCode");
@@ -203,12 +214,22 @@ public class ProductService {
         if (product == null || product.getVariants() == null) {
             return product;
         }
-        product.getVariants().forEach(variant -> {
-            if (variant != null) {
+
+        for (int i = 0; i < product.getVariants().size(); i++) {
+            ProductVariant variant = product.getVariants().get(i);
+            if (variant == null) {
+                continue;
+            }
+
+            if (variant.getProductName() == null || variant.getProductName().isBlank()) {
                 variant.setProductName(product.getName());
+            }
+
+            if (i == 0 && (variant.getFullDescription() == null || variant.getFullDescription().isBlank())) {
                 variant.setFullDescription(product.getDescription());
             }
-        });
+        }
+
         return product;
     }
 
@@ -219,13 +240,7 @@ public class ProductService {
             return null;
         }
 
-        String selectionSegment = variant.getSelections() == null ? null : variant.getSelections().stream()
-                .filter(Objects::nonNull)
-                .map(selection -> normalizeVariantToken(selection.getValueCode()))
-                .filter(Objects::nonNull)
-                .collect(Collectors.joining("-"));
-
-        String baseCode = Stream.of(modelCode, styleCode, selectionSegment)
+        String baseCode = Stream.of(modelCode, styleCode)
                 .filter(Objects::nonNull)
                 .filter(value -> !value.isBlank())
                 .collect(Collectors.joining("-"));
