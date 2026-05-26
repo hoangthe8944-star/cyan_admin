@@ -35,6 +35,15 @@ public class UserService {
         return toResponse(user);
     }
 
+    public UserResponse register(String email, String rawPassword, String fullName) {
+        String normalizedEmail = normalizeEmail(email);
+        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            throw new BadRequestException("Email is already registered");
+        }
+
+        return toResponse(createUser(normalizedEmail, rawPassword, fullName, UserRole.CUSTOMER));
+    }
+
     public User ensureAdminUser(String email, String rawPassword, String fullName) {
         return userRepository.findByEmailIgnoreCase(normalizeEmail(email))
                 .orElseGet(() -> createUser(email, rawPassword, fullName, UserRole.ADMIN));

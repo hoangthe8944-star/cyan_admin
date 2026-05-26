@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.cyan.catalog.dto.ProductVariantStyleDetailResponse;
 import com.example.cyan.catalog.model.Product;
 import com.example.cyan.catalog.service.ProductService;
 import com.example.cyan.common.model.enums.ProductStatus;
@@ -50,9 +51,21 @@ public class ProductController {
         return productService.findById(id);
     }
 
+    @GetMapping("/{id}/styles/{styleCode}")
+    public ProductVariantStyleDetailResponse findVariantByStyleCode(@PathVariable String id,
+            @PathVariable String styleCode) {
+        return productService.findVariantByStyleCode(id, styleCode);
+    }
+
     @GetMapping("/slug/{slug}")
     public Product findBySlug(@PathVariable String slug) {
         return productService.findBySlug(slug);
+    }
+
+    @GetMapping("/slug/{slug}/styles/{styleCode}")
+    public ProductVariantStyleDetailResponse findVariantByStyleCodeFromSlug(@PathVariable String slug,
+            @PathVariable String styleCode) {
+        return productService.findVariantByStyleCodeFromSlug(slug, styleCode);
     }
 
     @PutMapping("/{id}")

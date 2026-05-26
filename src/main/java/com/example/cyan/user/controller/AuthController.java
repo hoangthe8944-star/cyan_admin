@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.cyan.user.dto.LoginRequest;
+import com.example.cyan.user.dto.RegisterRequest;
 import com.example.cyan.user.dto.UserResponse;
 import com.example.cyan.user.service.UserService;
 
@@ -21,6 +22,11 @@ public class AuthController {
 
     public AuthController(UserService userService) {
         this.userService = userService;
+    }
+
+    @PostMapping("/register")
+    public UserResponse register(@Valid @RequestBody RegisterRequest request) {
+        return userService.register(request.getEmail(), request.getPassword(), request.getFullName());
     }
 
     @PostMapping("/login")

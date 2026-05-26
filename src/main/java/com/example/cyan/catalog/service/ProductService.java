@@ -9,9 +9,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.example.cyan.catalog.dto.ProductVariantStyleDetailResponse;
+import com.example.cyan.catalog.model.ProductOption;
+import com.example.cyan.catalog.model.ProductOptionValue;
 import org.springframework.stereotype.Service;
 
 import com.example.cyan.catalog.model.Product;
@@ -20,6 +24,7 @@ import com.example.cyan.catalog.repository.CategoryRepository;
 import com.example.cyan.catalog.repository.ProductRepository;
 import com.example.cyan.common.exception.BadRequestException;
 import com.example.cyan.common.exception.ResourceNotFoundException;
+import com.example.cyan.common.model.MediaAsset;
 import com.example.cyan.common.model.enums.ProductOptionType;
 import com.example.cyan.common.model.enums.ProductStatus;
 import com.example.cyan.common.util.SlugUtils;
@@ -65,6 +70,16 @@ public class ProductService {
                 .filter(variant -> variantCode.equals(variant.getVariantCode()))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Variant not found: " + variantCode));
+    }
+
+    public ProductVariantStyleDetailResponse findVariantByStyleCode(String productId, String styleCode) {
+        Product product = findById(productId);
+        return buildVariantStyleDetail(product, styleCode);
+    }
+
+    public ProductVariantStyleDetailResponse findVariantByStyleCodeFromSlug(String slug, String styleCode) {
+        Product product = findBySlug(slug);
+        return buildVariantStyleDetail(product, styleCode);
     }
 
     public List<String> suggestKeywords(String keyword, int limit) {
@@ -231,6 +246,73 @@ public class ProductService {
         }
 
         return product;
+    }
+
+    private ProductVariantStyleDetailResponse buildVariantStyleDetail(Product product, String styleCode) {
+        String normalizedStyleCode = normalizeVariantToken(styleCode);
+        if (normalizedStyleCode == null) {
+            throw new BadRequestException("Style code is required");
+        }
+
+        ProductVariant variant = product.getVariants().stream()
+                .filter(Objects::nonNull)
+                .filter(ProductVariant::isActive)
+                .filter(candidate -> normalizedStyleCode.equals(normalizeVariantToken(candidate.getStyleCode())))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Variant not found with styleCode: " + styleCode));
+
+        String styleName = resolveStyleName(product, variant, normalizedStyleCode);
+        String description = firstNonBlank(variant.getFullDescription(), product.getDescription(), product.getShortDescription());
+        List<MediaAsset> images = hasMedia(variant.getMedia()) ? variant.getMedia() : product.getGallery();
+
+        return new ProductVariantStyleDetailResponse(
+                variant.getVariantCode(),
+                variant.getStyleCode(),
+                firstNonBlank(styleName, variant.getProductName(), product.getName()),
+                description,
+                images == null ? List.of() : images);
+    }
+
+    private String resolveStyleName(Product product, ProductVariant variant, String normalizedStyleCode) {
+        Optional<String> optionLabel = product.getOptions().stream()
+                .filter(Objects::nonNull)
+                .filter(option -> option.getType() == ProductOptionType.STYLE)
+                .findFirst()
+                .map(ProductOption::getValues)
+                .stream()
+                .flatMap(List::stream)
+                .filter(Objects::nonNull)
+                .filter(value -> normalizedStyleCode.equals(normalizeVariantToken(value.getCode())))
+                .map(ProductOptionValue::getLabel)
+                .filter(Objects::nonNull)
+                .filter(label -> !label.isBlank())
+                .findFirst();
+        if (optionLabel.isPresent()) {
+            return optionLabel.get();
+        }
+
+        return variant.getSelections().stream()
+                .filter(Objects::nonNull)
+                .filter(selection -> selection.getOptionType() == ProductOptionType.STYLE)
+                .filter(selection -> normalizedStyleCode.equals(normalizeVariantToken(selection.getValueCode())))
+                .map(selection -> firstNonBlank(selection.getValueLabel(), variant.getProductName()))
+                .filter(Objects::nonNull)
+                .filter(label -> !label.isBlank())
+                .findFirst()
+                .orElse(variant.getProductName());
+    }
+
+    private boolean hasMedia(List<MediaAsset> mediaAssets) {
+        return mediaAssets != null && mediaAssets.stream().anyMatch(Objects::nonNull);
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private String generateVariantCode(ProductVariant variant) {
