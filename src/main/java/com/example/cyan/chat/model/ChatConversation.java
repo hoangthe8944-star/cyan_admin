@@ -58,6 +58,10 @@ public class ChatConversation extends BaseDocument {
 
     private Instant closedAt;
 
+    private boolean deleted;
+
+    private Instant deletedAt;
+
     @Valid
     private List<ChatMessage> messages = new ArrayList<>();
 
@@ -163,6 +167,22 @@ public class ChatConversation extends BaseDocument {
 
     public void setClosedAt(Instant closedAt) {
         this.closedAt = closedAt;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(Instant deletedAt) {
+        this.deletedAt = deletedAt;
     }
 
     public List<ChatMessage> getMessages() {

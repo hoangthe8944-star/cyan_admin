@@ -63,6 +63,7 @@ public class ChatService {
         return chatConversationRepository.findAll(
                 Sort.by(Sort.Order.desc("lastMessageAt"), Sort.Order.desc("createdAt")))
                 .stream()
+                .filter(conversation -> !conversation.isDeleted())
                 .map(this::toSummaryResponse)
                 .toList();
     }
@@ -132,6 +133,20 @@ public class ChatService {
         return toDetailResponse(chatConversationRepository.save(conversation));
     }
 
+    public void softDeleteConversation(String conversationId) {
+        ChatConversation conversation = findExistingConversation(conversationId);
+        if (conversation.isDeleted()) {
+            return;
+        }
+        conversation.setDeleted(true);
+        conversation.setDeletedAt(Instant.now());
+        conversation.setClosedAt(conversation.getClosedAt() == null ? Instant.now() : conversation.getClosedAt());
+        conversation.setStatus(ChatConversationStatus.CLOSED);
+        conversation.setUnreadAdminCount(0);
+        conversation.setUnreadCustomerCount(0);
+        chatConversationRepository.save(conversation);
+    }
+
     public ChatConversationDetailResponse markReadByAdmin(String conversationId) {
         ChatConversation conversation = findEntityById(conversationId);
         Instant now = Instant.now();
@@ -164,14 +179,26 @@ public class ChatService {
     }
 
     private ChatConversation findEntityById(String id) {
-        return chatConversationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Chat conversation not found: " + id));
+        ChatConversation conversation = findExistingConversation(id);
+        if (conversation.isDeleted()) {
+            throw new ResourceNotFoundException("Chat conversation not found: " + id);
+        }
+        return conversation;
     }
 
     private ChatConversation findEntityByCode(String conversationCode) {
-        return chatConversationRepository.findByConversationCode(conversationCode)
+        ChatConversation conversation = chatConversationRepository.findByConversationCode(conversationCode)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Chat conversation not found with code: " + conversationCode));
+        if (conversation.isDeleted()) {
+            throw new ResourceNotFoundException("Chat conversation not found with code: " + conversationCode);
+        }
+        return conversation;
+    }
+
+    private ChatConversation findExistingConversation(String id) {
+        return chatConversationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Chat conversation not found: " + id));
     }
 
     private ChatConversation findEntityByIdForCustomer(String customerUserId, String conversationId) {
@@ -209,6 +236,7 @@ public class ChatService {
                     });
         }
         return conversationsById.values().stream()
+                .filter(conversation -> !conversation.isDeleted())
                 .sorted(Comparator.comparing(ChatConversation::getLastMessageAt,
                         Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(ChatConversation::getCreatedAt,

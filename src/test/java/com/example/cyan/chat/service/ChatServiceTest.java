@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -142,5 +143,27 @@ class ChatServiceTest {
 
         assertThrows(BadRequestException.class,
                 () -> chatService.addCustomerMessage("chat-1", "Tin nhan moi"));
+    }
+
+    @Test
+    void softDeleteConversationMarksConversationDeletedInsteadOfRemovingIt() {
+        ChatConversation conversation = new ChatConversation();
+        conversation.setId("chat-1");
+        conversation.setStatus(ChatConversationStatus.PENDING_ADMIN);
+        conversation.setUnreadAdminCount(2);
+        conversation.setUnreadCustomerCount(1);
+
+        when(chatConversationRepository.findById("chat-1")).thenReturn(Optional.of(conversation));
+        when(chatConversationRepository.save(any(ChatConversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        chatService.softDeleteConversation("chat-1");
+
+        assertEquals(true, conversation.isDeleted());
+        assertEquals(ChatConversationStatus.CLOSED, conversation.getStatus());
+        assertEquals(0, conversation.getUnreadAdminCount());
+        assertEquals(0, conversation.getUnreadCustomerCount());
+        assertNotNull(conversation.getDeletedAt());
+        assertNotNull(conversation.getClosedAt());
+        verify(chatConversationRepository).save(conversation);
     }
 }
