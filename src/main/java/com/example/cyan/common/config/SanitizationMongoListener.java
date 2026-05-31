@@ -19,6 +19,7 @@ import com.example.cyan.common.util.TextSanitizer;
 import com.example.cyan.content.model.Banner;
 import com.example.cyan.content.model.Editorial;
 import com.example.cyan.content.model.EditorialSection;
+import com.example.cyan.content.model.LandingPageTheme;
 import com.example.cyan.content.model.ProductCollection;
 import com.example.cyan.order.model.Address;
 import com.example.cyan.order.model.CustomerInfo;
@@ -42,6 +43,8 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
             sanitizeEditorial(editorial);
         } else if (source instanceof ProductCollection collection) {
             sanitizeCollection(collection);
+        } else if (source instanceof LandingPageTheme theme) {
+            sanitizeLandingPageTheme(theme);
         } else if (source instanceof Order order) {
             sanitizeOrder(order);
         } else if (source instanceof ChatConversation conversation) {
@@ -147,6 +150,17 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
                     .map(TextSanitizer::cleanPlainText)
                     .toList());
         }
+    }
+
+    private void sanitizeLandingPageTheme(LandingPageTheme theme) {
+        theme.setName(TextSanitizer.cleanPlainText(theme.getName()));
+        theme.setSlug(TextSanitizer.cleanPlainText(theme.getSlug()));
+        theme.setDescription(TextSanitizer.cleanPlainTextPreserveWhitespace(theme.getDescription()));
+        theme.setHeroTitle(TextSanitizer.cleanPlainText(theme.getHeroTitle()));
+        theme.setHeroSubtitle(TextSanitizer.cleanPlainTextPreserveWhitespace(theme.getHeroSubtitle()));
+        theme.setCustomCss(TextSanitizer.cleanPlainTextPreserveWhitespace(theme.getCustomCss()));
+        sanitizeMedia(theme.getHeroMedia());
+        sanitizeSeo(theme.getSeo());
     }
 
     private void sanitizeSection(EditorialSection section) {
