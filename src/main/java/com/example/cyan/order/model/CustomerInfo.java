@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 
 public class CustomerInfo {
 
+    private String userId;
+
     @NotBlank
     @Size(max = 120)
     private String fullName;
@@ -17,6 +19,14 @@ public class CustomerInfo {
     @NotBlank
     @Size(max = 20)
     private String phoneNumber;
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
 
     public String getFullName() {
         return fullName;

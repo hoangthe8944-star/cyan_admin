@@ -212,6 +212,10 @@ public class StorefrontService {
         return orderService.checkout(request);
     }
 
+    public List<Order> getOrdersByUser(String userId) {
+        return orderService.findByUserId(userId);
+    }
+
     public Order lookupOrder(String orderCode, String phoneNumber) {
         Order order = orderService.findByCode(orderCode);
         if (order.getCustomer() == null || order.getCustomer().getPhoneNumber() == null

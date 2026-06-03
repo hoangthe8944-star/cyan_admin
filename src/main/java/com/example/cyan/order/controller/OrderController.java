@@ -53,6 +53,11 @@ public class OrderController {
         return orderService.findByCode(orderCode);
     }
 
+    @GetMapping("/user/{userId}")
+    public List<Order> findByUserId(@PathVariable String userId) {
+        return orderService.findByUserId(userId);
+    }
+
     @PatchMapping("/{id}/status")
     public Order updateStatus(@PathVariable String id, @Valid @RequestBody UpdateOrderStatusRequest request) {
         return orderService.updateStatus(id, request.orderStatus(), request.paymentStatus());

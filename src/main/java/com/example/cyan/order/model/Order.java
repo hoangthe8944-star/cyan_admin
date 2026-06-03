@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.example.cyan.user.dto.UserResponse;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -26,6 +28,11 @@ public class Order extends BaseDocument {
     @NotBlank
     @Size(max = 60)
     private String orderCode;
+
+    private String userId;
+
+    @Transient
+    private UserResponse user;
 
     @Valid
     @NotNull
@@ -190,5 +197,21 @@ public class Order extends BaseDocument {
 
     public void setMomoPayment(MomoPaymentInfo momoPayment) {
         this.momoPayment = momoPayment;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public UserResponse getUser() {
+        return user;
+    }
+
+    public void setUser(UserResponse user) {
+        this.user = user;
     }
 }

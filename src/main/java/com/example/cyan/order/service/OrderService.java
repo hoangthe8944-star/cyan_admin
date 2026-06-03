@@ -27,6 +27,10 @@ import com.example.cyan.order.model.MomoPaymentInfo;
 import com.example.cyan.order.model.Order;
 import com.example.cyan.order.model.OrderItem;
 import com.example.cyan.order.repository.OrderRepository;
+import com.example.cyan.user.dto.UserResponse;
+import com.example.cyan.user.model.User;
+import com.example.cyan.user.repository.UserRepository;
+import java.util.Objects;
 
 @Service
 public class OrderService {
@@ -35,39 +39,58 @@ public class OrderService {
     private final ProductService productService;
     private final ProductRepository productRepository;
     private final MomoPaymentService momoPaymentService;
+    private final UserRepository userRepository;
 
     public OrderService(OrderRepository orderRepository, ProductService productService,
-            ProductRepository productRepository, MomoPaymentService momoPaymentService) {
+            ProductRepository productRepository, MomoPaymentService momoPaymentService,
+            UserRepository userRepository) {
         this.orderRepository = orderRepository;
         this.productService = productService;
         this.productRepository = productRepository;
         this.momoPaymentService = momoPaymentService;
+        this.userRepository = userRepository;
     }
 
     public Order create(Order order) {
         prepareOrder(order);
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        populateUser(saved);
+        return saved;
     }
 
     public List<Order> findAll() {
-        return orderRepository.findAll();
+        List<Order> orders = orderRepository.findAll();
+        populateUsers(orders);
+        return orders;
     }
 
     public Order findById(String id) {
-        return orderRepository.findById(id)
+        Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + id));
+        populateUser(order);
+        return order;
     }
 
     public Order findByCode(String orderCode) {
-        return orderRepository.findByOrderCode(orderCode)
+        Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with code: " + orderCode));
+        populateUser(order);
+        return order;
+    }
+
+    public List<Order> findByUserId(String userId) {
+        List<Order> orders = orderRepository.findByUserId(userId);
+        populateUsers(orders);
+        return orders;
     }
 
     public Order updateStatus(String id, OrderStatus orderStatus, PaymentStatus paymentStatus) {
         Order order = findById(id);
         order.setOrderStatus(orderStatus);
         order.setPaymentStatus(paymentStatus);
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        populateUser(saved);
+        return saved;
     }
 
     public Order updateMomoCallback(String id, PaymentStatus paymentStatus, Integer resultCode,
@@ -90,7 +113,9 @@ public class OrderService {
         if (paymentStatus == PaymentStatus.PAID) {
             order.setOrderStatus(OrderStatus.PAID);
         }
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        populateUser(saved);
+        return saved;
     }
 
     @Transactional
@@ -153,7 +178,6 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
 
         CheckoutOrderResponse response = new CheckoutOrderResponse();
-        response.setOrder(savedOrder);
         response.setPaymentRequired(savedOrder.getPaymentMethod() == PaymentMethod.MOMO);
 
         if (savedOrder.getPaymentMethod() == PaymentMethod.MOMO) {
@@ -168,7 +192,6 @@ public class OrderService {
                 savedOrder.getMomoPayment().setResponseTime(momoResponse.responseTime() == null ? null
                         : Instant.ofEpochMilli(momoResponse.responseTime()));
                 savedOrder = orderRepository.save(savedOrder);
-                response.setOrder(savedOrder);
                 response.setPayUrl(momoResponse.payUrl());
                 response.setDeeplink(momoResponse.deeplink());
                 response.setQrCodeUrl(momoResponse.qrCodeUrl());
@@ -180,10 +203,14 @@ public class OrderService {
                     savedOrder.getMomoPayment().setResponseTime(Instant.now());
                 }
                 orderRepository.save(savedOrder);
+                populateUser(savedOrder);
+                response.setOrder(savedOrder);
                 throw ex;
             }
         }
 
+        populateUser(savedOrder);
+        response.setOrder(savedOrder);
         return response;
     }
 
@@ -229,6 +256,22 @@ public class OrderService {
         BigDecimal totalAmount = subtotal.add(shippingFee).subtract(discountAmount);
         if (totalAmount.signum() < 0) {
             throw new BadRequestException("Total amount cannot be negative");
+        }
+
+        if (order.getCustomer() != null) {
+            if (order.getUserId() == null || order.getUserId().isBlank()) {
+                if (order.getCustomer().getUserId() != null && !order.getCustomer().getUserId().isBlank()) {
+                    order.setUserId(order.getCustomer().getUserId());
+                } else if (order.getCustomer().getEmail() != null) {
+                    userRepository.findByEmailIgnoreCase(order.getCustomer().getEmail())
+                            .ifPresent(user -> {
+                                order.setUserId(user.getId());
+                                order.getCustomer().setUserId(user.getId());
+                            });
+                }
+            } else if (order.getCustomer().getUserId() == null || order.getCustomer().getUserId().isBlank()) {
+                order.getCustomer().setUserId(order.getUserId());
+            }
         }
 
         order.setOrderCode(order.getOrderCode() == null || order.getOrderCode().isBlank()
@@ -322,5 +365,38 @@ public class OrderService {
 
     private BigDecimal defaultValue(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private void populateUser(Order order) {
+        if (order == null || order.getUserId() == null || order.getUserId().isBlank()) {
+            return;
+        }
+        userRepository.findById(order.getUserId()).ifPresent(u -> {
+            order.setUser(new UserResponse(u.getId(), u.getEmail(), u.getFullName(), u.getRole(), u.isActive(), u.getCreatedAt(), u.getUpdatedAt()));
+        });
+    }
+
+    private void populateUsers(List<Order> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return;
+        }
+        java.util.Set<String> userIds = orders.stream()
+                .map(Order::getUserId)
+                .filter(Objects::nonNull)
+                .filter(id -> !id.isBlank())
+                .collect(java.util.stream.Collectors.toSet());
+        if (userIds.isEmpty()) {
+            return;
+        }
+        Map<String, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(java.util.stream.Collectors.toMap(User::getId, java.util.function.Function.identity()));
+        orders.forEach(order -> {
+            if (order.getUserId() != null) {
+                User u = userMap.get(order.getUserId());
+                if (u != null) {
+                    order.setUser(new UserResponse(u.getId(), u.getEmail(), u.getFullName(), u.getRole(), u.isActive(), u.getCreatedAt(), u.getUpdatedAt()));
+                }
+            }
+        });
     }
 }

@@ -134,6 +134,11 @@ public class StorefrontController {
         return storefrontService.createOrder(request);
     }
 
+    @GetMapping("/orders/user/{userId}")
+    public List<Order> getOrdersByUser(@PathVariable String userId) {
+        return storefrontService.getOrdersByUser(userId);
+    }
+
     @PostMapping("/orders/lookup")
     public Order lookupOrder(@Valid @RequestBody OrderLookupRequest request) {
         return storefrontService.lookupOrder(request.orderCode(), request.phoneNumber());
