@@ -55,6 +55,12 @@ public class AdminOrderController {
                 request.message(), request.payUrl(), request.deeplink(), request.qrCodeUrl());
     }
 
+    @PatchMapping("/{id}/vnpay-callback")
+    public Order updateVnPayCallback(@PathVariable String id, @Valid @RequestBody UpdateVnPayCallbackRequest request) {
+        return orderService.updateVnPayCallback(id, request.paymentStatus(), request.responseCode(), request.transactionNo(),
+                request.bankCode(), request.payDate(), request.message());
+    }
+
     public record UpdateOrderStatusRequest(
             @NotNull OrderStatus orderStatus,
             @NotNull PaymentStatus paymentStatus) {
@@ -68,5 +74,14 @@ public class AdminOrderController {
             String payUrl,
             String deeplink,
             String qrCodeUrl) {
+    }
+
+    public record UpdateVnPayCallbackRequest(
+            @NotNull PaymentStatus paymentStatus,
+            String responseCode,
+            String transactionNo,
+            String bankCode,
+            String payDate,
+            String message) {
     }
 }

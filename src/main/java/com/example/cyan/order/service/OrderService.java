@@ -122,6 +122,32 @@ public class OrderService {
         return saved;
     }
 
+    public Order updateVnPayCallback(String id, PaymentStatus paymentStatus, String responseCode,
+            String transactionNo, String bankCode, String payDate, String message) {
+        Order order = findById(id);
+        if (order.getVnpayPayment() == null) {
+            throw new BadRequestException("This order does not contain VNPay payment metadata");
+        }
+
+        maybeRestoreStockForFailedVnPay(order, paymentStatus);
+
+        order.getVnpayPayment().setResponseCode(responseCode);
+        order.getVnpayPayment().setTransactionNo(transactionNo);
+        if (bankCode != null) {
+            order.getVnpayPayment().setBankCode(bankCode);
+        }
+        order.getVnpayPayment().setPayDate(payDate);
+        order.getVnpayPayment().setMessage(message);
+        order.getVnpayPayment().setResponseTime(Instant.now());
+        order.setPaymentStatus(paymentStatus);
+        if (paymentStatus == PaymentStatus.PAID) {
+            order.setOrderStatus(OrderStatus.PAID);
+        }
+        Order saved = orderRepository.save(order);
+        populateUser(saved);
+        return saved;
+    }
+
     @Transactional
     public CheckoutOrderResponse checkout(CreateOrderRequest request) {
         Map<String, Integer> requestedQuantityByVariant = new LinkedHashMap<>();
