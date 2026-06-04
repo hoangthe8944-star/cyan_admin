@@ -24,6 +24,7 @@ import com.example.cyan.content.model.ProductCollection;
 import com.example.cyan.order.model.Address;
 import com.example.cyan.order.model.CustomerInfo;
 import com.example.cyan.order.model.MomoPaymentInfo;
+import com.example.cyan.order.model.VnPayPaymentInfo;
 import com.example.cyan.order.model.Order;
 import com.example.cyan.order.model.OrderItem;
 
@@ -181,6 +182,7 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
             order.getItems().forEach(this::sanitizeOrderItem);
         }
         sanitizeMomo(order.getMomoPayment());
+        sanitizeVnPay(order.getVnpayPayment());
     }
 
     private void sanitizeCustomer(CustomerInfo customer) {
@@ -230,6 +232,22 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
         momoPayment.setExtraData(TextSanitizer.cleanPlainText(momoPayment.getExtraData()));
         momoPayment.setLang(TextSanitizer.cleanPlainText(momoPayment.getLang()));
         momoPayment.setMessage(TextSanitizer.cleanPlainText(momoPayment.getMessage()));
+    }
+
+    private void sanitizeVnPay(VnPayPaymentInfo vnpayPayment) {
+        if (vnpayPayment == null) {
+            return;
+        }
+        vnpayPayment.setTmnCode(TextSanitizer.cleanPlainText(vnpayPayment.getTmnCode()));
+        vnpayPayment.setTxnRef(TextSanitizer.cleanPlainText(vnpayPayment.getTxnRef()));
+        vnpayPayment.setOrderInfo(TextSanitizer.cleanPlainText(vnpayPayment.getOrderInfo()));
+        vnpayPayment.setPayUrl(TextSanitizer.cleanPlainText(vnpayPayment.getPayUrl()));
+        vnpayPayment.setSecureHash(TextSanitizer.cleanPlainText(vnpayPayment.getSecureHash()));
+        vnpayPayment.setResponseCode(TextSanitizer.cleanPlainText(vnpayPayment.getResponseCode()));
+        vnpayPayment.setTransactionNo(TextSanitizer.cleanPlainText(vnpayPayment.getTransactionNo()));
+        vnpayPayment.setBankCode(TextSanitizer.cleanPlainText(vnpayPayment.getBankCode()));
+        vnpayPayment.setPayDate(TextSanitizer.cleanPlainText(vnpayPayment.getPayDate()));
+        vnpayPayment.setMessage(TextSanitizer.cleanPlainText(vnpayPayment.getMessage()));
     }
 
     private void sanitizeChatConversation(ChatConversation conversation) {

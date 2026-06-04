@@ -79,6 +79,9 @@ public class Order extends BaseDocument {
     @Valid
     private MomoPaymentInfo momoPayment;
 
+    @Valid
+    private VnPayPaymentInfo vnpayPayment;
+
     public String getOrderCode() {
         return orderCode;
     }
@@ -197,6 +200,14 @@ public class Order extends BaseDocument {
 
     public void setMomoPayment(MomoPaymentInfo momoPayment) {
         this.momoPayment = momoPayment;
+    }
+
+    public VnPayPaymentInfo getVnpayPayment() {
+        return vnpayPayment;
+    }
+
+    public void setVnpayPayment(VnPayPaymentInfo vnpayPayment) {
+        this.vnpayPayment = vnpayPayment;
     }
 
     public String getUserId() {

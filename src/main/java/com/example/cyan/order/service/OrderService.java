@@ -23,7 +23,9 @@ import com.example.cyan.common.model.enums.PaymentStatus;
 import com.example.cyan.order.dto.CheckoutOrderResponse;
 import com.example.cyan.order.dto.CreateOrderRequest;
 import com.example.cyan.order.dto.MomoIpnRequest;
+import com.example.cyan.order.dto.CheckoutVnPayRequest;
 import com.example.cyan.order.model.MomoPaymentInfo;
+import com.example.cyan.order.model.VnPayPaymentInfo;
 import com.example.cyan.order.model.Order;
 import com.example.cyan.order.model.OrderItem;
 import com.example.cyan.order.repository.OrderRepository;
@@ -39,15 +41,17 @@ public class OrderService {
     private final ProductService productService;
     private final ProductRepository productRepository;
     private final MomoPaymentService momoPaymentService;
+    private final VnPayPaymentService vnPayPaymentService;
     private final UserRepository userRepository;
 
     public OrderService(OrderRepository orderRepository, ProductService productService,
             ProductRepository productRepository, MomoPaymentService momoPaymentService,
-            UserRepository userRepository) {
+            VnPayPaymentService vnPayPaymentService, UserRepository userRepository) {
         this.orderRepository = orderRepository;
         this.productService = productService;
         this.productRepository = productRepository;
         this.momoPaymentService = momoPaymentService;
+        this.vnPayPaymentService = vnPayPaymentService;
         this.userRepository = userRepository;
     }
 
@@ -132,7 +136,7 @@ public class OrderService {
         order.setDiscountAmount(request.getDiscountAmount());
         order.setPaymentMethod(request.getPaymentMethod());
         order.setNote(request.getNote());
-        order.setPaymentStatus(request.getPaymentMethod() == PaymentMethod.MOMO ? PaymentStatus.PENDING : PaymentStatus.UNPAID);
+        order.setPaymentStatus((request.getPaymentMethod() == PaymentMethod.MOMO || request.getPaymentMethod() == PaymentMethod.VNPAY) ? PaymentStatus.PENDING : PaymentStatus.UNPAID);
         order.setOrderStatus(OrderStatus.PENDING);
         if (request.getPaymentMethod() == PaymentMethod.MOMO) {
             order.setMomoPayment(new MomoPaymentInfo());
@@ -143,6 +147,12 @@ public class OrderService {
                 order.getMomoPayment().setExtraData(request.getMomoPayment().getExtraData());
                 order.getMomoPayment().setRequestType(request.getMomoPayment().getRequestType());
                 order.getMomoPayment().setLang(request.getMomoPayment().getLang());
+            }
+        }
+        if (request.getPaymentMethod() == PaymentMethod.VNPAY) {
+            order.setVnpayPayment(new VnPayPaymentInfo());
+            if (request.getVnpayPayment() != null) {
+                order.getVnpayPayment().setOrderInfo(request.getVnpayPayment().getOrderInfo());
             }
         }
 
@@ -178,7 +188,7 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
 
         CheckoutOrderResponse response = new CheckoutOrderResponse();
-        response.setPaymentRequired(savedOrder.getPaymentMethod() == PaymentMethod.MOMO);
+        response.setPaymentRequired(savedOrder.getPaymentMethod() == PaymentMethod.MOMO || savedOrder.getPaymentMethod() == PaymentMethod.VNPAY);
 
         if (savedOrder.getPaymentMethod() == PaymentMethod.MOMO) {
             try {
@@ -201,6 +211,25 @@ public class OrderService {
                 if (savedOrder.getMomoPayment() != null) {
                     savedOrder.getMomoPayment().setMessage(ex.getMessage());
                     savedOrder.getMomoPayment().setResponseTime(Instant.now());
+                }
+                orderRepository.save(savedOrder);
+                populateUser(savedOrder);
+                response.setOrder(savedOrder);
+                throw ex;
+            }
+        } else if (savedOrder.getPaymentMethod() == PaymentMethod.VNPAY) {
+            try {
+                VnPayPaymentService.VnPayCreatePaymentResponse vnpayResponse = vnPayPaymentService.createPayment(savedOrder,
+                        request.getVnpayPayment());
+                savedOrder.getVnpayPayment().setPayUrl(vnpayResponse.payUrl());
+                savedOrder = orderRepository.save(savedOrder);
+                response.setPayUrl(vnpayResponse.payUrl());
+            } catch (RuntimeException ex) {
+                restoreStock(order);
+                savedOrder.setPaymentStatus(PaymentStatus.FAILED);
+                if (savedOrder.getVnpayPayment() != null) {
+                    savedOrder.getVnpayPayment().setMessage(ex.getMessage());
+                    savedOrder.getVnpayPayment().setResponseTime(Instant.now());
                 }
                 orderRepository.save(savedOrder);
                 populateUser(savedOrder);
@@ -297,6 +326,12 @@ public class OrderService {
             order.getMomoPayment().setRequestId(order.getMomoPayment().getRequestId() == null
                     ? UUID.randomUUID().toString()
                     : order.getMomoPayment().getRequestId());
+        }
+        if (order.getPaymentMethod() == PaymentMethod.VNPAY && order.getVnpayPayment() != null) {
+            order.getVnpayPayment().setAmount(totalAmount.setScale(0, RoundingMode.HALF_UP).longValue());
+            order.getVnpayPayment().setOrderInfo(order.getVnpayPayment().getOrderInfo() == null
+                    ? "Thanh toan don hang OrivenJewelry " + order.getOrderCode()
+                    : order.getVnpayPayment().getOrderInfo());
         }
     }
 
@@ -398,5 +433,70 @@ public class OrderService {
                 }
             }
         });
+    }
+
+    @Transactional
+    public void handleVnPayIpn(Map<String, String> params) {
+        vnPayPaymentService.verifyIpn(params);
+        String txnRef = params.get("vnp_TxnRef");
+        Order order = findByCode(txnRef);
+        if (order.getVnpayPayment() == null) {
+            throw new BadRequestException("This order does not contain VNPay payment metadata");
+        }
+        if (!params.get("vnp_TmnCode").equals(order.getVnpayPayment().getTmnCode())) {
+            throw new BadRequestException("VNPay tmnCode mismatch");
+        }
+        long vnpAmount = Long.parseLong(params.get("vnp_Amount"));
+        if (vnpAmount != order.getVnpayPayment().getAmount() * 100) {
+            throw new BadRequestException("VNPay amount mismatch");
+        }
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new BadRequestException("Order already confirmed");
+        }
+
+        String responseCode = params.get("vnp_ResponseCode");
+        String transactionStatus = params.get("vnp_TransactionStatus");
+        String transactionNo = params.get("vnp_TransactionNo");
+        String bankCode = params.get("vnp_BankCode");
+        String payDate = params.get("vnp_PayDate");
+
+        PaymentStatus nextPaymentStatus = resolveVnPayPaymentStatus(responseCode, transactionStatus);
+        maybeRestoreStockForFailedVnPay(order, nextPaymentStatus);
+
+        order.getVnpayPayment().setResponseCode(responseCode);
+        order.getVnpayPayment().setTransactionNo(transactionNo);
+        if (bankCode != null) {
+            order.getVnpayPayment().setBankCode(bankCode);
+        }
+        order.getVnpayPayment().setPayDate(payDate);
+        order.getVnpayPayment().setResponseTime(Instant.now());
+        order.setPaymentStatus(nextPaymentStatus);
+
+        if ("00".equals(responseCode) && "00".equals(transactionStatus)) {
+            order.setOrderStatus(OrderStatus.PAID);
+            order.getVnpayPayment().setMessage("Success");
+        } else {
+            order.getVnpayPayment().setMessage("Failed: " + responseCode);
+        }
+        orderRepository.save(order);
+    }
+
+    private PaymentStatus resolveVnPayPaymentStatus(String responseCode, String transactionStatus) {
+        if ("00".equals(responseCode) && "00".equals(transactionStatus)) {
+            return PaymentStatus.PAID;
+        }
+        return PaymentStatus.FAILED;
+    }
+
+    private void maybeRestoreStockForFailedVnPay(Order order, PaymentStatus nextPaymentStatus) {
+        if (order.getPaymentMethod() != PaymentMethod.VNPAY || nextPaymentStatus != PaymentStatus.FAILED) {
+            return;
+        }
+
+        if (order.getPaymentStatus() != PaymentStatus.PENDING && order.getPaymentStatus() != PaymentStatus.UNPAID) {
+            return;
+        }
+
+        restoreStock(order);
     }
 }

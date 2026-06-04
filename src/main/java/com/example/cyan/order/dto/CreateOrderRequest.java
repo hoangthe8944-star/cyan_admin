@@ -46,6 +46,9 @@ public class CreateOrderRequest {
     @Valid
     private CheckoutMomoRequest momoPayment;
 
+    @Valid
+    private CheckoutVnPayRequest vnpayPayment;
+
     public CustomerInfo getCustomer() {
         return customer;
     }
@@ -116,5 +119,13 @@ public class CreateOrderRequest {
 
     public void setMomoPayment(CheckoutMomoRequest momoPayment) {
         this.momoPayment = momoPayment;
+    }
+
+    public CheckoutVnPayRequest getVnpayPayment() {
+        return vnpayPayment;
+    }
+
+    public void setVnpayPayment(CheckoutVnPayRequest vnpayPayment) {
+        this.vnpayPayment = vnpayPayment;
     }
 }

@@ -150,6 +150,49 @@ public class StorefrontController {
         storefrontService.handleMomoIpn(request);
     }
 
+    @GetMapping("/payments/vnpay/ipn")
+    public java.util.Map<String, String> vnpayIpn(@RequestParam java.util.Map<String, String> params) {
+        try {
+            storefrontService.handleVnPayIpn(params);
+            java.util.Map<String, String> response = new java.util.HashMap<>();
+            response.put("RspCode", "00");
+            response.put("Message", "Confirm Success");
+            return response;
+        } catch (com.example.cyan.common.exception.ResourceNotFoundException ex) {
+            java.util.Map<String, String> response = new java.util.HashMap<>();
+            response.put("RspCode", "01");
+            response.put("Message", "Order not found");
+            return response;
+        } catch (com.example.cyan.common.exception.BadRequestException ex) {
+            java.util.Map<String, String> response = new java.util.HashMap<>();
+            String msg = ex.getMessage();
+            if ("Order already confirmed".equals(msg)) {
+                response.put("RspCode", "02");
+                response.put("Message", "Order already confirmed");
+            } else if (msg != null && msg.contains("mismatch")) {
+                if (msg.contains("amount")) {
+                    response.put("RspCode", "04");
+                    response.put("Message", "Invalid amount");
+                } else if (msg.contains("signature")) {
+                    response.put("RspCode", "97");
+                    response.put("Message", "Invalid signature");
+                } else {
+                    response.put("RspCode", "99");
+                    response.put("Message", "Input data mismatch");
+                }
+            } else {
+                response.put("RspCode", "99");
+                response.put("Message", "Bad request");
+            }
+            return response;
+        } catch (Exception ex) {
+            java.util.Map<String, String> response = new java.util.HashMap<>();
+            response.put("RspCode", "99");
+            response.put("Message", "Unknown error");
+            return response;
+        }
+    }
+
     public record OrderLookupRequest(
             @NotBlank String orderCode,
             @NotBlank String phoneNumber) {

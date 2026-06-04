@@ -229,6 +229,10 @@ public class StorefrontService {
         orderService.handleMomoIpn(request);
     }
 
+    public void handleVnPayIpn(Map<String, String> params) {
+        orderService.handleVnPayIpn(params);
+    }
+
     public SearchSuggestionResponse getSearchSuggestions(String keyword, int keywordLimit, int productLimit) {
         SearchSuggestionResponse response = new SearchSuggestionResponse();
         response.setKeyword(keyword);
