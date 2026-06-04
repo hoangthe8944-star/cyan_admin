@@ -21,6 +21,7 @@ import com.example.cyan.order.dto.CheckoutOrderResponse;
 import com.example.cyan.order.dto.CreateOrderRequest;
 import com.example.cyan.order.dto.MomoIpnRequest;
 import com.example.cyan.order.model.Order;
+import com.example.cyan.contact.model.Contact;
 import com.example.cyan.storefront.dto.CollectionDetailResponse;
 import com.example.cyan.storefront.dto.CollectionSummaryResponse;
 import com.example.cyan.storefront.dto.CategoryTreeResponse;
@@ -191,6 +192,12 @@ public class StorefrontController {
             response.put("Message", "Unknown error");
             return response;
         }
+    }
+
+    @PostMapping("/contacts")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Contact createContact(@Valid @RequestBody Contact contact) {
+        return storefrontService.createContact(contact);
     }
 
     public record OrderLookupRequest(

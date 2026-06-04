@@ -27,6 +27,7 @@ import com.example.cyan.order.model.MomoPaymentInfo;
 import com.example.cyan.order.model.VnPayPaymentInfo;
 import com.example.cyan.order.model.Order;
 import com.example.cyan.order.model.OrderItem;
+import com.example.cyan.contact.model.Contact;
 
 @Component
 public class SanitizationMongoListener extends AbstractMongoEventListener<Object> {
@@ -50,6 +51,8 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
             sanitizeOrder(order);
         } else if (source instanceof ChatConversation conversation) {
             sanitizeChatConversation(conversation);
+        } else if (source instanceof Contact contact) {
+            sanitizeContact(contact);
         }
     }
 
@@ -297,5 +300,13 @@ public class SanitizationMongoListener extends AbstractMongoEventListener<Object
         mediaAsset.setUrl(TextSanitizer.cleanPlainText(mediaAsset.getUrl()));
         mediaAsset.setThumbnailUrl(TextSanitizer.cleanPlainText(mediaAsset.getThumbnailUrl()));
         mediaAsset.setAltText(TextSanitizer.cleanPlainText(mediaAsset.getAltText()));
+    }
+
+    private void sanitizeContact(Contact contact) {
+        contact.setCustomerName(TextSanitizer.cleanPlainText(contact.getCustomerName()));
+        contact.setEmail(TextSanitizer.cleanPlainText(contact.getEmail()));
+        contact.setPhoneNumber(TextSanitizer.cleanPlainText(contact.getPhoneNumber()));
+        contact.setSubject(TextSanitizer.cleanPlainText(contact.getSubject()));
+        contact.setMessage(TextSanitizer.cleanPlainTextPreserveWhitespace(contact.getMessage()));
     }
 }

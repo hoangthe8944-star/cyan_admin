@@ -33,6 +33,8 @@ import com.example.cyan.order.dto.CreateOrderRequest;
 import com.example.cyan.order.dto.MomoIpnRequest;
 import com.example.cyan.order.model.Order;
 import com.example.cyan.order.service.OrderService;
+import com.example.cyan.contact.model.Contact;
+import com.example.cyan.contact.service.ContactService;
 import com.example.cyan.storefront.dto.CollectionDetailResponse;
 import com.example.cyan.storefront.dto.CollectionSummaryResponse;
 import com.example.cyan.storefront.dto.CategoryTreeResponse;
@@ -50,17 +52,19 @@ public class StorefrontService {
     private final EditorialService editorialService;
     private final ProductCollectionService productCollectionService;
     private final OrderService orderService;
+    private final ContactService contactService;
     private final StorefrontMapper storefrontMapper;
 
     public StorefrontService(CategoryService categoryService, ProductService productService, BannerService bannerService,
             EditorialService editorialService, ProductCollectionService productCollectionService,
-            OrderService orderService, StorefrontMapper storefrontMapper) {
+            OrderService orderService, ContactService contactService, StorefrontMapper storefrontMapper) {
         this.categoryService = categoryService;
         this.productService = productService;
         this.bannerService = bannerService;
         this.editorialService = editorialService;
         this.productCollectionService = productCollectionService;
         this.orderService = orderService;
+        this.contactService = contactService;
         this.storefrontMapper = storefrontMapper;
     }
 
@@ -231,6 +235,10 @@ public class StorefrontService {
 
     public void handleVnPayIpn(Map<String, String> params) {
         orderService.handleVnPayIpn(params);
+    }
+
+    public Contact createContact(Contact contact) {
+        return contactService.create(contact);
     }
 
     public SearchSuggestionResponse getSearchSuggestions(String keyword, int keywordLimit, int productLimit) {
