@@ -29,7 +29,8 @@ public class VnPayPaymentService {
     public VnPayCreatePaymentResponse createPayment(Order order, CheckoutVnPayRequest override) {
         validateConfiguration();
 
-        String redirectUrl = firstNonBlank(override != null ? override.getRedirectUrl() : null, vnPayProperties.getReturnUrl());
+        String redirectUrl = firstNonBlank(override != null ? override.getRedirectUrl() : null,
+                vnPayProperties.getReturnUrl());
         String ipnUrl = firstNonBlank(override != null ? override.getIpnUrl() : null, vnPayProperties.getIpnUrl());
         String lang = firstNonBlank(override != null ? override.getLang() : null, "vi");
         String bankCode = override != null ? override.getBankCode() : null;
@@ -71,31 +72,28 @@ public class VnPayPaymentService {
 
         StringBuilder hashData = new StringBuilder();
         StringBuilder query = new StringBuilder();
-        Iterator<String> itr = fieldNames.iterator();
-        while (itr.hasNext()) {
-            String fieldName = itr.next();
+
+        for (String fieldName : fieldNames) {
             String fieldValue = vnpParams.get(fieldName);
-            if ((fieldValue != null) && (fieldValue.length() > 0)) {
-                // Build hash data
-                hashData.append(fieldName);
-                hashData.append('=');
-                hashData.append(urlEncode(fieldValue));
-                // Build query
-                query.append(urlEncode(fieldName));
-                query.append('=');
-                query.append(urlEncode(fieldValue));
-                if (itr.hasNext()) {
-                    query.append('&');
+
+            if (fieldValue != null && !fieldValue.isBlank()) {
+                if (!hashData.isEmpty()) {
                     hashData.append('&');
+                    query.append('&');
                 }
+
+                hashData.append(fieldName)
+                        .append('=')
+                        .append(urlEncode(fieldValue));
+
+                query.append(urlEncode(fieldName))
+                        .append('=')
+                        .append(urlEncode(fieldValue));
             }
         }
 
-        String queryUrl = query.toString();
         String vnpSecureHash = hmacSHA512(vnPayProperties.getSecretKey(), hashData.toString());
-        queryUrl += "&vnp_SecureHash=" + vnpSecureHash;
-
-        String paymentUrl = vnPayProperties.getUrl() + "?" + queryUrl;
+        String paymentUrl = vnPayProperties.getUrl() + "?" + query + "&vnp_SecureHash=" + vnpSecureHash;
 
         order.getVnpayPayment().setPayUrl(paymentUrl);
         order.getVnpayPayment().setSecureHash(vnpSecureHash);
@@ -115,7 +113,8 @@ public class VnPayPaymentService {
         for (Map.Entry<String, String> entry : fields.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
-            if (key != null && key.startsWith("vnp_") && !key.equals("vnp_SecureHash") && !key.equals("vnp_SecureHashType")) {
+            if (key != null && key.startsWith("vnp_") && !key.equals("vnp_SecureHash")
+                    && !key.equals("vnp_SecureHashType")) {
                 signedFields.put(key, value);
             }
         }
@@ -155,7 +154,7 @@ public class VnPayPaymentService {
 
     private String urlEncode(String value) {
         try {
-            return URLEncoder.encode(value, StandardCharsets.UTF_8.toString()).replace("+", "%20");
+            return URLEncoder.encode(value, StandardCharsets.US_ASCII.toString());
         } catch (UnsupportedEncodingException e) {
             return value;
         }
@@ -180,7 +179,7 @@ public class VnPayPaymentService {
             byte[] bytes = hmac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             StringBuilder builder = new StringBuilder(bytes.length * 2);
             for (byte value : bytes) {
-                builder.append(String.format(Locale.ROOT, "%02x", value & 0xff));
+                builder.append(String.format(Locale.ROOT, "%02X", value & 0xff));
             }
             return builder.toString();
         } catch (Exception ex) {
